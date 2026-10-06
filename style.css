@@ -168,6 +168,11 @@ html, body {
 .card-title { font-weight: bold; margin-bottom: var(--sp-1); }
 .card-desc { color: var(--ink-soft); font-size: var(--fs-small); margin-bottom: 6px; min-height: 30px; line-height: 1.5; }
 .count { color: var(--sun-700); font-weight: bold; }
+#bribe-panel {
+  background: #fff8e1; border: 2px solid var(--sun-500); border-radius: var(--r-md);
+  padding: 10px; margin: 8px 0; text-align: left;
+}
+#bribe-panel h3 { margin: 0 0 4px; font-size: var(--fs-body); }
 .stat { display: flex; align-items: center; gap: 6px; font-size: var(--fs-caption); margin: 2px 0; }
 .stat .bar { flex: 1; height: 8px; background: #e0e0e0; border-radius: var(--sp-1); overflow: hidden; }
 .stat .bar i { display: block; height: 100%; background: #66bb6a; border-radius: var(--sp-1); }
