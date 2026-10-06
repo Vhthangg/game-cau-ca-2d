@@ -111,39 +111,90 @@ const Art = (function () {
     ctx.restore();
   }
 
-  // --- Đồ đựng cá (mode Trốn vợ): xô/thùng trên bờ, rọ nổi lập lờ ở mép nước ---
-  // x,y: điểm đặt (đáy đồ đựng). Vẽ tại đúng tọa độ game.js truyền sang để khớp vùng chạm.
-  function drawContainer(ctx, t, id, x, y) {
+  // --- Đồ đựng cá (mode Trốn vợ): xô ghẻ/thùng câu trên bờ, rọng lưới thả ở mép nước ---
+  // x,y: điểm đặt. Vẽ tại đúng tọa độ game.js truyền sang để khớp vùng chạm.
+  // load: tỉ lệ tải kg/cap — vẽ vết rách lưới khi rọng quá tải nặng.
+  function drawContainer(ctx, t, id, x, y, load) {
     if (id === 'ro') {
-      // Rọ tre tròn, nửa chìm, lập lờ theo sóng
-      const cy = y + Math.sin(t * 2.2) * 5;
-      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(x, cy + 16, 34, 8, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.ellipse(x, cy + 16, 46, 12, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#8a5a2b';
-      ctx.beginPath(); ctx.ellipse(x, cy, 30, 22, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#a9743b';
-      ctx.beginPath(); ctx.ellipse(x, cy, 30, 22, 0, Math.PI, 0); ctx.fill();
-      ctx.strokeStyle = 'rgba(70,45,20,.55)'; ctx.lineWidth = 2;
-      for (let i = -2; i <= 2; i++) {
-        ctx.beginPath(); ctx.moveTo(x + i * 11, cy - 21); ctx.lineTo(x + i * 13, cy + 4); ctx.stroke();
+      // RỌNG ĐỰNG CÁ (keepnet): miệng vành kim loại tròn, ống lưới dài thả xuống nước.
+      const bob = Math.sin(t * 2.2) * 4;        // lập lờ theo sóng
+      const sway = Math.sin(t * 1.3) * 6;       // ống lưới đung đưa nhẹ
+      const my = y + bob;                       // tâm miệng rọng (mặt nước)
+      const LEN = 108;                          // chiều dài ống lưới
+      const topW = 62, botW = 42;
+      // thân ống lưới: hình thang thuôn, tối màu cho nổi trên mặt nước
+      ctx.fillStyle = 'rgba(18,32,30,0.88)';
+      ctx.beginPath();
+      ctx.moveTo(x - topW / 2, my);
+      ctx.quadraticCurveTo(x - topW / 2 + sway * 0.4, my + LEN * 0.5, x - botW / 2 + sway, my + LEN);
+      ctx.lineTo(x + botW / 2 + sway, my + LEN);
+      ctx.quadraticCurveTo(x + topW / 2 + sway * 0.4, my + LEN * 0.5, x + topW / 2, my);
+      ctx.closePath(); ctx.fill();
+      // mắt lưới chéo
+      ctx.strokeStyle = 'rgba(130,170,158,0.35)'; ctx.lineWidth = 1;
+      for (let d = -5; d <= 5; d++) {
+        ctx.beginPath(); ctx.moveTo(x + d * 12, my + 4); ctx.lineTo(x + d * 12 - 22 + sway, my + LEN - 4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + d * 12, my + 4); ctx.lineTo(x + d * 12 + 22 + sway, my + LEN - 4); ctx.stroke();
       }
-      ctx.beginPath(); ctx.ellipse(x, cy - 2, 30, 8, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#6b4a26';
-      ctx.beginPath(); ctx.ellipse(x, cy - 20, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
-      // dây buộc về phía bờ
-      ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x, cy - 24); ctx.quadraticCurveTo(x + 34, cy - 58, x + 72, cy - 40); ctx.stroke();
+      // 2 vành kim loại giữa thân ống
+      [0.38, 0.72].forEach(p => {
+        const wy = my + LEN * p, ww = (topW + (botW - topW) * p) / 2;
+        ctx.strokeStyle = '#9aa5ad'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(x + sway * p, wy, ww, 7, 0, 0, Math.PI * 2); ctx.stroke();
+      });
+      // đáy ống khép
+      ctx.fillStyle = 'rgba(10,20,18,0.9)';
+      ctx.beginPath(); ctx.ellipse(x + sway, my + LEN, botW / 2, 7, 0, 0, Math.PI * 2); ctx.fill();
+      // bóng cá bên trong khi có cá
+      if (load > 0.01) {
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        for (let i = 0; i < 3; i++) {
+          const fy = my + LEN * (0.3 + i * 0.22), fx = x + Math.sin(t * 3 + i * 2) * 8 + sway * 0.5;
+          ctx.beginPath(); ctx.ellipse(fx, fy, 9, 4, 0.2 * Math.sin(t * 2 + i), 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      // vết rách lưới khi quá tải nặng
+      if (load > 1.2) {
+        ctx.strokeStyle = 'rgba(220,230,228,0.85)'; ctx.lineWidth = 1.5;
+        const ry = my + LEN * 0.55, rx = x - 12 + sway * 0.5;
+        ctx.beginPath(); ctx.moveTo(rx, ry);
+        ctx.lineTo(rx + 8, ry + 8); ctx.lineTo(rx - 2, ry + 14); ctx.lineTo(rx + 10, ry + 22);
+        ctx.stroke();
+      }
+      // miệng rọng: vành kim loại + dây đai đỏ chằng ngang
+      ctx.fillStyle = 'rgba(12,22,20,0.9)';
+      ctx.beginPath(); ctx.ellipse(x, my, 31, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#cfd8dc'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(x, my, 33, 11, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#b71c1c'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(x - 30, my - 2); ctx.lineTo(x + 30, my + 2); ctx.stroke();
+      ctx.fillStyle = '#7f0000';
+      ctx.beginPath(); ctx.arc(x, my, 4, 0, Math.PI * 2); ctx.fill();
+      // dây buộc về phía bờ + cọc cắm
+      ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(x + 20, my - 6);
+      ctx.quadraticCurveTo(x + 52, my - 44, x + 78, my - 34); ctx.stroke();
+      ctx.fillStyle = '#6d4c41';
+      ctx.fillRect(x + 74, my - 52, 7, 22);
       return;
     }
     if (id === 'thung') {
-      // Thùng nhựa xanh to, có nắp
-      ctx.fillStyle = '#1565c0'; rr(ctx, x - 26, y - 52, 52, 52, 8); ctx.fill();
-      ctx.fillStyle = '#0d47a1';
-      rr(ctx, x - 26, y - 32, 52, 10, 4); ctx.fill();
-      rr(ctx, x - 26, y - 14, 52, 10, 4); ctx.fill();
-      ctx.fillStyle = '#90caf9'; rr(ctx, x - 26, y - 58, 52, 10, 5); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(x - 20, y - 50, 8, 46);
+      // THÙNG CÂU (tackle box): hộp chữ nhật, nắp phẳng ngồi được, quai + khóa gài
+      ctx.fillStyle = '#1c1f22';                                    // chân đế
+      ctx.fillRect(x - 24, y - 4, 8, 5); ctx.fillRect(x + 16, y - 4, 8, 5);
+      ctx.fillStyle = '#2f3439'; rr(ctx, x - 28, y - 46, 56, 43, 5); ctx.fill();   // thân hộp
+      ctx.strokeStyle = '#17191c'; ctx.lineWidth = 2; rr(ctx, x - 28, y - 46, 56, 43, 5); ctx.stroke();
+      ctx.fillStyle = '#c62828'; ctx.fillRect(x - 28, y - 44, 56, 6);               // viền đỏ
+      ctx.fillStyle = 'rgba(198,40,40,.55)'; ctx.fillRect(x - 28, y - 22, 56, 3);   // sọc trang trí
+      [-13, 5].forEach(kx => {                                                     // 2 khóa gài
+        ctx.fillStyle = '#c62828'; rr(ctx, x + kx, y - 40, 8, 14, 2); ctx.fill();
+        ctx.strokeStyle = '#7f0000'; ctx.lineWidth = 1.5; rr(ctx, x + kx, y - 40, 8, 14, 2); ctx.stroke();
+      });
+      ctx.fillStyle = '#434a52'; rr(ctx, x - 30, y - 60, 60, 15, 4); ctx.fill();   // nắp phẳng
+      ctx.strokeStyle = '#22262a'; ctx.lineWidth = 2; rr(ctx, x - 30, y - 60, 60, 15, 4); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x - 26, y - 59, 52, 3);
+      ctx.strokeStyle = '#22262a'; ctx.lineWidth = 3;                              // quai xách lõm
+      ctx.beginPath(); ctx.moveTo(x - 10, y - 53); ctx.lineTo(x + 10, y - 53); ctx.stroke();
       return;
     }
     // Xô ghẻ mặc định: xô tôn cũ màu xám, hơi móp
@@ -247,7 +298,7 @@ const Art = (function () {
       }
     });
     // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
-    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y);
+    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y, v.container.load);
     else drawDecoBucket(ctx, 690, 492);
 
     drawOverlay(ctx, t, v);
@@ -322,7 +373,7 @@ const Art = (function () {
       }
     });
     // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
-    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y);
+    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y, v.container.load);
     else drawDecoBucket(ctx, 690, 492);
 
     // --- Điểm câu (phase chọn điểm) ---
@@ -487,7 +538,7 @@ const Art = (function () {
     });
     drawAngler(ctx, 150, 915);
     // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
-    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y);
+    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y, v.container.load);
     else drawDecoBucket(ctx, 420, 868);
 
     drawOverlay(ctx, t, v);
