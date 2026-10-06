@@ -11,6 +11,7 @@
   <!-- HUD: in-flow trên mobile dọc, overlay trên desktop -->
   <div id="hud" class="hidden">
     <span id="hud-money" class="pill">💰 0đ</span>
+    <span id="hud-stamina" class="pill">⚡ <b id="hud-stam-n">100</b><span class="stam-bar"><i id="hud-stam-fill"></i></span></span>
     <span id="hud-level" class="pill">⭐ Cấp 1</span>
     <span id="hud-map" class="pill">🏡 Ao làng</span>
     <span id="hud-weather" class="pill hidden">☀️</span>
@@ -39,6 +40,7 @@
         <h1>🎣 CÂU CÁ AO LÀNG</h1>
         <p class="subtitle">Game câu cá 2D Việt Nam — học câu thật qua từng thao tác</p>
         <p class="money-line">💰 <span id="menu-money">0đ</span> &nbsp;•&nbsp; ⭐ <span id="menu-level">Cấp 1</span></p>
+        <p class="stamina-line">⚡ Thể lực: <b id="menu-stam">100</b>/100 <span class="stam-bar"><i id="menu-stam-fill"></i></span></p>
         <p id="menu-wife-line" class="wife-line hidden">😒 Nghi ngờ: <b id="menu-susp">0</b> &nbsp;•&nbsp; 😍 Hạnh phúc: <b id="menu-happy">0</b> &nbsp;•&nbsp; 🙏 Chân thành: <b id="menu-sincere">0</b></p>
         <p id="ban-notice" class="ban-notice hidden"></p>
         <button id="btn-to-prepare" class="btn big primary">🎣 Câu tự do</button>
@@ -54,6 +56,7 @@
         <button id="btn-to-leaderboard" class="btn big">🏆 Bảng xếp hạng</button>
         <button id="btn-to-shop" class="btn big">Cửa hàng</button>
         <button id="btn-to-help" class="btn big ghost">Hướng dẫn</button>
+        <button id="btn-rest" class="btn big ghost">😴 Nghỉ ngơi (+40)</button>
       </div>
     </div>
 
@@ -142,6 +145,7 @@
       <div class="dig-topbar">
         <span class="dig-pill">⏱️ <b id="dig-time">20</b>s</span>
         <span class="dig-pill">🪱 <b id="dig-count">0</b></span>
+        <span class="dig-pill">⚡ <b id="dig-stam">100</b></span>
         <span class="dig-pill small" id="dig-left"></span>
       </div>
       <div class="dig-bottombar">
@@ -176,6 +180,7 @@
           <li><b>Bắt nhịp:</b> khi cá cắn, nhấn đúng lúc kim chạy vào <span class="green">vùng xanh</span> (cá to chạy nhanh hơn, vùng hẹp hơn). Sớm/trễ là hụt, mất mồi.</li>
           <li><b>Bo cá:</b> <b>giữ</b> chuột/phím để kéo (tăng lực), <b>thả</b> để nhả. Giữ kim trong vùng xanh cho đầy thanh tiến trình. Căng quá đứt dây, lỏng quá tuột cá!</li>
           <li><b>Bán cá</b> lấy tiền mua cần xịn hơn. Cá to, cần khỏe — cứ thế mà lên đời!</li>
+          <li><b>⚡ Thể lực:</b> quăng cần −2, mỗi con giun đào được −1, bo cá thắng −(6 + độ khó cá × 8), bo thua −4, giật hụt −1, nấu ăn thắng −5. Hết thể lực (= 0) thì không quăng cần / đào giun được — hãy về nhà <b>😴 Nghỉ ngơi</b> (+40, tối đa 3 lần/ngày) hoặc chờ hồi tự nhiên (+1 mỗi 2 phút).</li>
           <li><b>Sông quê</b> (mở khi câu 15 con ở ao hoặc đạt cấp 2): chọn 1 trong 3 điểm câu — Bến đò (dễ), Gầm cầu (vừa), Bãi bồi (dòng xiết, khó). Mồi nhẹ ở chỗ xiết sẽ bị trôi, tỉ lệ cắn giảm!</li>
           <li><b>Thời tiết & giờ vàng:</b> sau mưa cá ăn mạnh hơn; 5–7h sáng và 16–18h là giờ vàng câu cá.</li>
           <li><b>Cấp cần thủ</b> tăng theo tổng số cá đã câu — mở khóa map và cần mới. <b>Nhiệm vụ ngày</b> cho thưởng mỗi ngày, đừng quên nhận!</li>
@@ -224,6 +229,8 @@
       <div class="panel wide">
         <h2>🏠 Về nhà</h2>
         <p class="subtitle">😒 Nghi ngờ: <b id="wh-susp">0</b> &nbsp;•&nbsp; 😍 Hạnh phúc: <b id="wh-happy">0</b></p>
+        <p class="stamina-line">⚡ Thể lực: <b id="wh-stam">100</b>/100 <span class="stam-bar"><i id="wh-stam-fill"></i></span>
+          &nbsp;<button id="btn-rest-home" class="btn small">😴 Nghỉ ngơi (+40)</button></p>
         <div id="wh-titles" class="titles"></div>
         <h3>🎣 Cá mang về (<span id="wh-kept-n">0</span>/<span id="wh-kept-cap">5</span>)</h3>
         <div id="wh-kept" class="cards"></div>

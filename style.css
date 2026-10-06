@@ -314,6 +314,16 @@ html, body {
 .kit-cell.wrong { background: #ffcdd2; border-color: var(--danger); }
 /* HUD mode vợ */
 #hud-susp.hot { background: rgba(198, 40, 40, .9); border-color: #ff8a80; }
+/* ---- Thanh thể lực ---- */
+.stam-bar {
+  display: inline-block; width: 46px; height: 8px; border-radius: 4px; overflow: hidden;
+  background: rgba(255, 255, 255, .25); vertical-align: middle; margin-left: 5px;
+}
+.panel .stam-bar, .stamina-line .stam-bar { background: #e0e0e0; }
+.stam-bar i { display: block; height: 100%; border-radius: 4px; transition: width .3s ease, background-color .3s ease; }
+#hud-stamina.hot { background: rgba(198, 40, 40, .9); border-color: #ff8a80; }
+.stamina-line { margin: 6px 0; font-size: 15px; }
+.stamina-line .btn.small { margin: 2px 0 2px 6px; }
 #hud-buff { background: rgba(27, 94, 32, .9); }
 
 /* ============ Portrait: layout dọc native (body.is-portrait do JS chốt) ============ */
