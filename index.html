@@ -128,13 +128,15 @@
       </div>
     </div>
 
-    <!-- Mini-game đào giun -->
-    <div id="scr-dig" class="screen hidden">
-      <div class="panel">
-        <h2>⛏️ Đào giun đất</h2>
-        <p>Chạm vào giun trồi lên! Còn <b id="dig-time">20</b>s — đã đào: <b id="dig-count">0</b> con<br><span class="subtitle" id="dig-left"></span></p>
-        <div id="dig-grid"></div>
-        <button id="btn-dig-end" class="btn">Xong</button>
+    <!-- Mini-game đào giun: vườn đất vẽ trên canvas, HUD overlay trong suốt -->
+    <div id="scr-dig" class="screen hidden dig-screen">
+      <div class="dig-topbar">
+        <span class="dig-pill">⏱️ <b id="dig-time">20</b>s</span>
+        <span class="dig-pill">🪱 <b id="dig-count">0</b></span>
+        <span class="dig-pill small" id="dig-left"></span>
+      </div>
+      <div class="dig-bottombar">
+        <button id="btn-dig-end" class="btn big">Xong</button>
       </div>
     </div>
 

@@ -177,20 +177,22 @@ html, body {
   text-decoration: underline; cursor: pointer;
 }
 
-/* ---- Mini-game đào giun ---- */
-#dig-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2);
-  margin: var(--sp-3) auto; max-width: 380px;
+/* ---- Mini-game đào giun: vườn đất trên canvas, HUD overlay trong suốt ---- */
+.dig-screen {
+  background: transparent; pointer-events: none;
+  flex-direction: column; justify-content: space-between; align-items: stretch;
+  padding: calc(var(--sp-3) + env(safe-area-inset-top, 0px)) var(--sp-3)
+           calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
 }
-.dig-cell {
-  aspect-ratio: 1; background: #8d6e63; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 30px; cursor: pointer; border: 2px solid #6d4c41;
-  transition: transform 120ms ease, background-color var(--t-fast) ease;
+.dig-topbar { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; pointer-events: none; }
+.dig-pill {
+  background: rgba(20, 35, 28, .78); color: #fff8e7;
+  border-radius: 999px; padding: 8px 14px; font-size: 16px; font-weight: bold;
+  border: 2px solid rgba(255, 255, 255, .25); white-space: nowrap;
 }
-.dig-cell:active { transform: scale(.93); }
-.dig-cell.active { background: #a1887f; animation: pop .18s ease-out; }
-@keyframes pop { from { transform: scale(.8); } to { transform: scale(1); } }
+.dig-pill.small { font-size: 13px; font-weight: normal; opacity: .95; }
+.dig-bottombar { display: flex; justify-content: center; pointer-events: none; }
+.dig-bottombar .btn { pointer-events: auto; min-width: 200px; }
 
 /* ---- Badge nhiệm vụ ---- */
 .badge {
@@ -243,7 +245,6 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dig-cell.active { animation: none; }
   * { transition-duration: 0.01ms !important; }
 }
 

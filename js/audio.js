@@ -47,6 +47,8 @@ const Sfx = {
   sell()   { this.tone(1320, 0.08, 'square', 0.07); this.tone(1760, 0.14, 'square', 0.07, 0.09); },
   // Tõm nước
   splash() { this.tone(300, 0.12, 'sine', 0.10); this.tone(180, 0.15, 'sine', 0.08, 0.06); },
+  // Cuốc bổ xuống đất: "cụp" trầm
+  dig()    { this.tone(140, 0.09, 'triangle', 0.14); this.tone(85, 0.13, 'sine', 0.12, 0.05); },
 };
 
 /* ===== Nhạc nền: Web Audio thuần, giai điệu ngũ cung gợi quê Việt Nam =====
