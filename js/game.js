@@ -64,7 +64,9 @@ function defaultSave() {
            totalEarned: 0, biggestFish: 0, playerName: '', lbSent: 0,
            // Hệ thống đồ đựng cá (mode Trốn vợ): câu ở bờ KHÔNG bán ngay,
            // chỉ "Cho vào đồ đựng" — về nhà mới Bán/Dâng/Nấu. (Tự do giữ nguyên.)
-           containers: ['xo'], activeContainer: 'xo', keptFish: [] };
+           containers: ['xo'], activeContainer: 'xo', keptFish: [],
+           // Thanh thể lực: tốn khi quăng/đào/bo/nấu; hết (=0) thì về nhà nghỉ
+           stamina: 100, staminaTs: 0, restDay: null };
 }
 let S;
 try { S = Object.assign(defaultSave(), JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); }
@@ -79,6 +81,10 @@ if (Array.isArray(S.basket) && S.basket.length && !S.keptFish.length) {
   S.keptFish = S.basket.map(f => ({ fishId: f.fishId, name: f.name, weight: f.weight, price: f.price }));
 }
 S.basket = [];
+// Tương thích save cũ: thể lực mặc định đầy, timestamp hồi phục = bây giờ
+if (S.stamina == null) S.stamina = STAMINA.max;
+if (!S.staminaTs) S.staminaTs = Date.now();
+regenStamina(); // hồi thể lực theo thời gian thực kể từ lần chơi trước
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 function rod() { return RODS.find(r => r.id === S.rod) || RODS[0]; }
 /* ---------- Hệ thống đồ đựng cá (mode Trốn vợ) ---------- */
@@ -96,6 +102,58 @@ function containerPos() {
 }
 // Cấp cần thủ: floor(tổng cá đã câu / 10) + 1, tối đa 15
 function level() { return Math.min(15, Math.floor((S.totalFish || 0) / 10) + 1); }
+
+/* ---------- Thanh thể lực ---------- */
+let stamWarned = false;  // cảnh báo thể lực thấp 1 lần mỗi chuyến
+let stamRegenT = 0;
+// Hồi phục theo thời gian thực: +1 mỗi STAMINA.regenSec giây, tối đa STAMINA.max.
+// Tính từ staminaTs (lần cập nhật cuối) nên thoát game quay lại vẫn được hồi.
+function regenStamina() {
+  const now = Date.now();
+  if (!S.staminaTs) S.staminaTs = now;
+  const cur = S.stamina == null ? STAMINA.max : S.stamina;
+  if (cur >= STAMINA.max) { S.staminaTs = now; return; }
+  const elapsed = now - S.staminaTs;
+  if (elapsed >= STAMINA.regenSec * 1000) {
+    const add = Math.floor(elapsed / (STAMINA.regenSec * 1000));
+    S.stamina = Math.min(STAMINA.max, cur + add);
+    S.staminaTs += add * STAMINA.regenSec * 1000;
+    save(); updateHUD();
+  }
+}
+// Trừ n thể lực. Trả false nếu đã hết (=0) — caller tự toast + chặn hành động.
+function drainStamina(n) {
+  regenStamina();
+  if ((S.stamina || 0) <= 0) return false;
+  S.stamina = Math.max(0, (S.stamina || 0) - n);
+  if (!S.staminaTs) S.staminaTs = Date.now();
+  save(); updateHUD();
+  checkStamWarn();
+  return true;
+}
+function checkStamWarn() {
+  if ((S.stamina || 0) <= STAMINA.warnAt && !stamWarned && (isFishing() || phase === 'DIG')) {
+    stamWarned = true;
+    toast('⚠️ Thể lực thấp! Về nhà nghỉ ngơi kẻo kiệt sức...');
+    Sfx.fail();
+  }
+}
+// Số lần nghỉ ngơi còn lại trong ngày
+function restsLeft() {
+  const t = todayStr();
+  if (!S.restDay || S.restDay.date !== t) S.restDay = { date: t, count: 0 };
+  return Math.max(0, STAMINA.restPerDay - S.restDay.count);
+}
+function doRest() {
+  if (restsLeft() <= 0) { toast('Hôm nay đã nghỉ đủ ' + STAMINA.restPerDay + ' lần rồi! Mai nghỉ tiếp nhé 😴'); Sfx.fail(); return; }
+  if ((S.stamina || 0) >= STAMINA.max) { toast('Thể lực đang đầy ắp, nghỉ gì nữa! 💪'); return; }
+  S.restDay.count++;
+  S.stamina = Math.min(STAMINA.max, (S.stamina || 0) + STAMINA.restGain);
+  S.staminaTs = Date.now();
+  save(); Sfx.caught(); updateHUD();
+  toast('😴 Nghỉ ngơi xong, thể lực +' + STAMINA.restGain + '! (còn ' + restsLeft() + '/' + STAMINA.restPerDay + ' lần hôm nay)');
+}
+function stamFillColor(v) { return v > 50 ? '#66bb6a' : (v > STAMINA.warnAt ? '#ffca28' : '#ef5350'); }
 function mapUnlocked(id) {
   if (id === 'ao') return true;
   if (id === 'song') return S.wifeApproved || (S.caughtAo || 0) >= 15 || level() >= 2;
@@ -218,6 +276,31 @@ function updateHUD() {
   $('hud-giun').textContent = '🪱 ' + S.giun;
   $('hud-cam').textContent = '🟤 ' + S.cam;
   $('hud-rod').textContent = '🎣 ' + rod().name;
+  // Thanh thể lực (lúc đi câu, đào giun, ở nhà)
+  regenStamina();
+  const sv = Math.round(S.stamina == null ? STAMINA.max : S.stamina);
+  const scol = stamFillColor(sv);
+  $('hud-stam-n').textContent = sv;
+  const sfill = $('hud-stam-fill');
+  sfill.style.width = sv + '%'; sfill.style.background = scol;
+  $('hud-stamina').classList.toggle('hot', sv <= STAMINA.warnAt);
+  const dstam = $('dig-stam'); if (dstam) dstam.textContent = sv;
+  const mstam = $('menu-stam');
+  if (mstam) {
+    mstam.textContent = sv;
+    const mf = $('menu-stam-fill'); if (mf) { mf.style.width = sv + '%'; mf.style.background = scol; }
+  }
+  const wstam = $('wh-stam');
+  if (wstam) {
+    wstam.textContent = sv;
+    const wf = $('wh-stam-fill'); if (wf) { wf.style.width = sv + '%'; wf.style.background = scol; }
+  }
+  // Nút "Nghỉ ngơi" (menu + màn hình nhà): +40, tối đa 3 lần/ngày
+  const rl = restsLeft(), cantRest = rl <= 0 || sv >= STAMINA.max;
+  const rb1 = $('btn-rest');
+  if (rb1) { rb1.disabled = cantRest; rb1.textContent = '😴 Nghỉ ngơi (+40) — còn ' + rl + '/' + STAMINA.restPerDay; }
+  const rb2 = $('btn-rest-home');
+  if (rb2) { rb2.disabled = cantRest; rb2.textContent = '😴 Nghỉ ngơi (+40) — còn ' + rl + '/' + STAMINA.restPerDay; }
   // Đợt 2: HUD mode Trốn vợ
   const wife = S.mode === 'wife' && (trip || isFishing());
   $('hud-clock').classList.toggle('hidden', !wife);
@@ -279,7 +362,7 @@ function startWifeTrip() {
     callAt: rnd(120, 360), resumePhase: null,
   };
   S.keptFish = []; // đầu chuyến: đồ đựng trống
-  riskT = 0; overWarned = false; contShakeT = 0;
+  riskT = 0; overWarned = false; contShakeT = 0; stamWarned = false;
   if (!S.containers.includes(S.activeContainer)) S.activeContainer = S.containers[S.containers.length - 1];
   S.weekEntries[todayStr()] = true;
   save();
@@ -311,6 +394,7 @@ function enterMapSelect() { phase = 'MAP'; show('scr-map'); renderMapSelect(); }
 /* ---------- Vào phiên câu ---------- */
 function enterFish(mapId) {
   S.map = mapId; spot = null; save();
+  stamWarned = false;
   // Thời tiết ngẫu nhiên mỗi phiên: 25% vừa mưa xong → cá ăn mạnh
   session.weather = Math.random() < 0.25 ? 'mua' : 'nang';
   session.golden = isGoldenHour();
@@ -448,7 +532,7 @@ function renderPrepare() {
   $('btn-go-fish').disabled = !hasBait;
   $('prep-nobait-hint').classList.toggle('hidden', hasBait);
   $('btn-dig').textContent = digLabel();
-  $('btn-dig').disabled = digsLeft() <= 0;
+  $('btn-dig').disabled = digsLeft() <= 0 || (S.stamina || 0) <= 0;
   // Đồ đựng cá (chỉ mode Trốn vợ): chọn trong số đã sở hữu
   const wifeMode = S.mode === 'wife';
   $('prep-cont-title').classList.toggle('hidden', !wifeMode);
@@ -476,7 +560,7 @@ function renderShop() {
     '<br><a href="#" class="aff-link" data-item="Cám câu">🛒 Mua ngoài đời</a></div>' +
     '<div class="card"><div class="card-title">🪱 Giun đất <span class="count">x' + S.giun + '</span></div>' +
     '<div class="card-desc">Miễn phí — tự tay đào mới có! Còn ' + digsLeft() + '/' + DIG.perDay + ' lượt hôm nay.</div>' +
-    '<button class="btn small" data-act="dig"' + (digsLeft() <= 0 ? ' disabled' : '') + '>' + digLabel() + '</button></div>';
+    '<button class="btn small" data-act="dig"' + (digsLeft() <= 0 || (S.stamina || 0) <= 0 ? ' disabled' : '') + '>' + digLabel() + '</button></div>';
   // Đồ đựng cá (mode Trốn vợ) — xô ghẻ mặc định đã có
   $('shop-containers').innerHTML = CONTAINERS.filter(c => c.price > 0).map(c => {
     const owned = S.containers.includes(c.id);
@@ -532,6 +616,7 @@ function digSpawn() {
 }
 function digTap(p) {
   if (!digS || phase !== 'DIG') return;
+  if ((S.stamina || 0) <= 0) { toast('😮‍💨 Hết thể lực rồi! Về nhà nghỉ ngơi đi!'); Sfx.fail(); return; }
   Sfx.init();
   const r = cv.getBoundingClientRect();
   const hitR = Math.max(46, 48 / (r.width / L.W)); // ≥48px vật lý
@@ -550,6 +635,7 @@ function digTap(p) {
     const got = DIG.minYield + Math.floor(Math.random() * (DIG.maxYield - DIG.minYield + 1));
     digS.dug += got; $('dig-count').textContent = digS.dug;
     digS.hoes.push({ x: p.x, y: p.y, t0: tG, dur: 0.38, struck: false });
+    drainStamina(got); // mỗi con giun đào được −1 thể lực
     Sfx.dig();
   } else {
     digS.hoes.push({ x: p.x, y: p.y, t0: tG, dur: 0.38, struck: false });
@@ -583,6 +669,7 @@ function digUpdate(dt) {
 }
 function enterDig(fromShop) {
   if (digsLeft() <= 0) { toast('😮‍💨 Tay đã mỏi, mai đào tiếp nhé! (tối đa ' + DIG.perDay + ' lượt/ngày)'); return; }
+  if ((S.stamina || 0) <= 0) { toast('😮‍💨 Hết thể lực rồi! Về nhà nghỉ ngơi đi!'); Sfx.fail(); return; }
   S.digDay.count++; save();
   $('dig-left').textContent = 'Lượt đào còn lại hôm nay: ' + digsLeft() + '/' + DIG.perDay;
   phase = 'DIG'; show('scr-dig');
@@ -620,6 +707,7 @@ function waterBounds(x, y) {
 
 function doCast(x, y) {
   if (!waterBounds(x, y)) { toast('Chạm vào mặt nước để quăng cần!'); return; }
+  if (!drainStamina(STAMINA.cast)) { toast('😮‍💨 Hết thể lực rồi! Về nhà nghỉ ngơi đi!'); Sfx.fail(); return; }
   const maxX = castMinX() + rod().cast * castRange();
   if (x > maxX) { x = maxX; toast('Cần của bạn chỉ quăng tới đây!'); }
   fx = x; fy = y; hint = null;
@@ -741,6 +829,7 @@ function strikeJudge() {
 }
 function strikeMiss(msg) {
   Sfx.fail(); toast(msg);
+  drainStamina(STAMINA.strikeMiss); // giật hụt −1
   questEvent('miss');
   afterAttempt();
 }
@@ -765,6 +854,8 @@ function fightWin() {
   const w = rnd(fish.min, fish.max);
   lastWeight = Math.round(w * 100) / 100;
   lastPrice = Math.round(lastWeight * fish.price);
+  // Bo cá thắng: −(6 + round(diff×8)) — cá càng khó càng mệt
+  drainStamina(6 + Math.round(fish.diff * 8));
   // Đếm cá cho cấp độ & mở khóa map
   S.totalFish = (S.totalFish || 0) + 1;
   if (S.map === 'ao') S.caughtAo = (S.caughtAo || 0) + 1;
@@ -861,6 +952,7 @@ function showFunny(text) {
 }
 function fightLost(msg) {
   Sfx.fail(); fight = null; toast(msg);
+  drainStamina(STAMINA.fightLost); // bo thua −4
   questEvent('miss');
   afterAttempt();
 }
@@ -1015,6 +1107,7 @@ function enterKitchen() {
     if (res === 'win') {
       const cooked = (S.keptFish || []).shift(); // nấu 1 con cá trong đồ đựng
       S.suspicion = Math.max(0, (S.suspicion || 0) - 20);
+      drainStamina(STAMINA.kitchen); // nấu ăn thắng −5
       save();
       toast('👨‍🍳 Nấu ăn thành công! Món "' + (cooked ? cooked.name : 'cá') + ' kho tộ" — vợ ăn khen ngon (-20 nghi ngờ) 😋');
       Sfx.caught();
@@ -1104,7 +1197,7 @@ cv.addEventListener('contextmenu', e => e.preventDefault());
 function actionCfg() {
   switch (phase) {
     case 'CAST':
-      return { label: '🎣 Quăng nhanh', fn: () => doCast(castMinX() + castRange() * 0.55, L.portrait ? 460 : 330) };
+      return { label: '🎣 Quăng nhanh (−2⚡)', fn: () => doCast(castMinX() + castRange() * 0.55, L.portrait ? 460 : 330) };
     case 'WAIT':
       return { label: '🔄 Thu cần', fn: () => enterCast('Chạm vào mặt nước để quăng lại!') };
     case 'BITE':
@@ -1123,12 +1216,13 @@ function updateActionBar() {
   if (!bar || !btn) return;
   const anyScreen = !!document.querySelector('#ui .screen:not(.hidden)');
   const cfg = (L.portrait && isFishing() && !anyScreen) ? actionCfg() : null;
-  const key = (cfg ? '1' : '0') + '|' + phase;
+  const key = (cfg ? '1' : '0') + '|' + phase + '|' + ((S.stamina || 0) <= 0 ? '0' : '1');
   if (key === abKey) return;
   abKey = key;
   bar.classList.toggle('hidden', !cfg);
   if (!cfg) { fitPortraitCanvas(); return; }
   btn.textContent = cfg.label;
+  btn.disabled = phase === 'CAST' && (S.stamina || 0) <= 0; // hết thể lực: không quăng được
   if (cfg.hold) {
     btn.onclick = null;
     btn.onpointerdown = e => { e.preventDefault(); Sfx.init(); holding = true; };
@@ -1190,6 +1284,8 @@ function buyBribe(id) {
   renderBribe(); updateHUD();
 }
 bindClick('btn-to-quest', enterQuest);
+bindClick('btn-rest', doRest);
+bindClick('btn-rest-home', doRest);
 bindClick('btn-to-shop', enterShop);
 bindClick('btn-to-help', enterHelp);
 bindClick('btn-help-back', enterMenu);
@@ -1547,6 +1643,9 @@ function loop(ts) {
   update(dt);
   render();
   updateActionBar(); // đồng bộ cụm nút portrait theo phase (có cache, rẻ)
+  // Thể lực hồi dần theo thời gian thực kể cả khi đang mở game
+  stamRegenT += dt;
+  if (stamRegenT >= 5) { stamRegenT = 0; regenStamina(); }
   // Đợt 2: cập nhật đồng hồ game trên HUD theo từng phút
   if (S.mode === 'wife' && trip && ! $('hud-clock').classList.contains('hidden')) {
     const cm = Math.floor(trip.gameMin);
@@ -1690,10 +1789,21 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     forceBite() { if (phase === 'WAIT') waitT = 0; },
     forceStrikeWin() { if (strike) strike.pos = strike.zc; },
     forceFightWin() { if (fight) fight.prog = 1; },
+    forceFightLost() { fightLost('Đứt dây! (test)'); },
     selectSpot(i) { spot = RIVER_SPOTS[i]; },
     // Đồ đựng cá (test)
-    cont() { return { containers: S.containers.slice(), active: S.activeContainer, kept: S.keptFish.slice(), cap: contDef().cap }; },
-    contKg() { return keptKg(); }, contLoad() { return contLoad(); },
+    cont() { return { containers: S.containers.slice(), active: S.activeContainer, kept: S.keptFish.slice(), cap: contDef().cap }; },    contKg() { return keptKg(); }, contLoad() { return contLoad(); },
+    // Thể lực (test)
+    stam() { return { v: S.stamina, ts: S.staminaTs }; },
+    setStam(v) { S.stamina = v; save(); updateHUD(); },
+    setStamTs(ts) { S.staminaTs = ts; save(); },
+    rest() { doRest(); },
+    rests() { return restsLeft(); },
+    regen() { regenStamina(); return S.stamina; },
+    digWorms() { return (digS && digS.worms || []).filter(w => !w.caught).map(w => ({ x: w.x, y: w.y })); },
+    digAt(x, y) { digTap({ x, y }); },
+    dug() { return digS ? digS.dug : -1; },
+    endDigNow() { if (digS) { const b = document.getElementById('btn-dig-end'); if (b) b.click(); } },
     setKept(arr) { S.keptFish = arr; save(); },
     sellKeptNow() { sellKept(); },
     openContainer() { enterContainer(); },
