@@ -37,6 +37,12 @@ function updateLayout() {
     const sx = L.W / oW, sy = L.H / oH;
     fx *= sx; fy *= sy;
     splashes.forEach(s => { s.x *= sx; s.y *= sy; });
+    // Mini-game đào giun: remap giun/cuốc/hạt theo layout mới + vẽ lại vườn
+    if (typeof digS !== 'undefined' && digS) {
+      for (const arr of [digS.worms, digS.hoes, digS.parts, digS.marks])
+        arr.forEach(o => { o.x *= sx; o.y *= sy; });
+      digS.decor = makeDigDecor();
+    }
   }
   document.body.classList.toggle('is-portrait', p);
   updateActionBar();
@@ -429,43 +435,104 @@ function digsLeft() {
   return Math.max(0, DIG.perDay - S.digDay.count);
 }
 function digLabel() { return '⛏️ Đào giun (' + digsLeft() + '/' + DIG.perDay + ')'; }
+// --- Mini-game đào giun: vườn đất trên canvas (không còn lưới ô) ---
+let digS = null;
+function digSoilY() { return L.portrait ? 120 : 78; }
+function digBucket() { return { x: L.W - 58, y: digSoilY() + 48 }; }
+function makeDigDecor() {
+  const W = L.W, H = L.H, sy = digSoilY(), R = Math.random;
+  const d = { dots: [], pebbles: [], weeds: [], mounds: [] };
+  for (let i = 0; i < 90; i++) d.dots.push({ x: 10 + R() * (W - 20), y: sy + 8 + R() * (H - sy - 16), r: 1 + R() * 2.2, l: R() < 0.5 });
+  for (let i = 0; i < 7; i++) d.pebbles.push({ x: 20 + R() * (W - 40), y: sy + 30 + R() * (H - sy - 60), rx: 5 + R() * 7, ry: 4 + R() * 5 });
+  for (let i = 0; i < 10; i++) d.weeds.push({ x: 16 + R() * (W - 32), y: sy + 24 + R() * (H - sy - 48), s: 0.7 + R() * 0.7 });
+  for (let i = 0; i < 5; i++) d.mounds.push({ x: 30 + R() * (W - 60), y: sy + 40 + R() * (H - sy - 80), r: 10 + R() * 10 });
+  return d;
+}
+function digSpawn() {
+  if (!digS || phase !== 'DIG') return;
+  const maxAge = DIG.activeMs / 1000;
+  const active = digS.worms.filter(w => !w.caught && (tG - w.born) < maxAge);
+  if (active.length >= 6) return;
+  const W = L.W, H = L.H, sy = digSoilY();
+  const yMax = H - (L.portrait ? 140 : 90);
+  for (let k = 0; k < 8; k++) {
+    const x = 36 + Math.random() * (W - 72);
+    const y = sy + 56 + Math.random() * Math.max(40, yMax - sy - 56);
+    if (x > W - 130 && y < sy + 120) continue; // tránh xô đựng
+    if (active.every(w => Math.hypot(w.x - x, w.y - y) > 70)) {
+      digS.worms.push({ x, y, born: tG, ph: Math.random() * 6.28, caught: false, fly: 0 });
+      return;
+    }
+  }
+}
+function digTap(p) {
+  if (!digS || phase !== 'DIG') return;
+  Sfx.init();
+  const r = cv.getBoundingClientRect();
+  const hitR = Math.max(46, 48 / (r.width / L.W)); // ≥48px vật lý
+  const maxAge = DIG.activeMs / 1000;
+  let best = null, bd = 1e9;
+  for (const w of digS.worms) {
+    if (w.caught) continue;
+    const age = tG - w.born;
+    if (age < 0.08 || age > maxAge) continue;
+    const h = Art.wormHead(w, tG);
+    const d = Math.hypot(p.x - h.x, p.y - h.y);
+    if (d < hitR && d < bd) { bd = d; best = w; }
+  }
+  if (best) {
+    best.caught = true; best.fly = tG;
+    const got = DIG.minYield + Math.floor(Math.random() * (DIG.maxYield - DIG.minYield + 1));
+    digS.dug += got; $('dig-count').textContent = digS.dug;
+    digS.hoes.push({ x: p.x, y: p.y, t0: tG, dur: 0.38, struck: false });
+    Sfx.dig();
+  } else {
+    digS.hoes.push({ x: p.x, y: p.y, t0: tG, dur: 0.38, struck: false });
+    digS.marks.push({ x: p.x, y: p.y, t0: tG, dur: 0.7 });
+    Sfx.click();
+  }
+}
+function digUpdate(dt) {
+  const s = digS; if (!s || phase !== 'DIG') return;
+  const maxAge = DIG.activeMs / 1000;
+  for (const h of s.hoes) {
+    const p = (tG - h.t0) / h.dur;
+    if (!h.struck && p >= 0.55) {
+      h.struck = true;
+      for (let i = 0; i < 10; i++) { // đất văng tung tóe
+        const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
+        s.parts.push({
+          x: h.x, y: h.y, vx: Math.cos(a) * sp, vy: -80 - Math.random() * 160,
+          life: 0, max: 0.5 + Math.random() * 0.3, sz: 2.5 + Math.random() * 3.5,
+          rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 12,
+          c: ['#8d6e63', '#6d4c41', '#a1887f'][i % 3],
+        });
+      }
+    }
+  }
+  s.hoes = s.hoes.filter(h => (tG - h.t0) < h.dur + 0.1);
+  for (const pt of s.parts) { pt.life += dt; pt.vy += 1100 * dt; pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.rot += pt.vr * dt; }
+  s.parts = s.parts.filter(p => p.life < p.max);
+  s.marks = s.marks.filter(m => (tG - m.t0) < m.dur);
+  s.worms = s.worms.filter(w => w.caught ? (tG - w.fly) < 0.5 : (tG - w.born) < maxAge);
+}
 function enterDig(fromShop) {
   if (digsLeft() <= 0) { toast('😮‍💨 Tay đã mỏi, mai đào tiếp nhé! (tối đa ' + DIG.perDay + ' lượt/ngày)'); return; }
   S.digDay.count++; save();
   $('dig-left').textContent = 'Lượt đào còn lại hôm nay: ' + digsLeft() + '/' + DIG.perDay;
   phase = 'DIG'; show('scr-dig');
   $('dig-from-shop').value = fromShop ? '1' : '';
-  let dug = 0, timeLeft = DIG.time;
-  const grid = $('dig-grid'); grid.innerHTML = '';
-  const cells = [];
-  for (let i = 0; i < 16; i++) {
-    const c = document.createElement('div');
-    c.className = 'dig-cell'; c.textContent = '🟤';
-    grid.appendChild(c); cells.push(c);
-  }
-  $('dig-time').textContent = timeLeft; $('dig-count').textContent = dug;
-  const pop = setInterval(() => {
-    const free = cells.filter(c => !c.classList.contains('active'));
-    if (!free.length) return;
-    const c = free[Math.floor(Math.random() * free.length)];
-    c.classList.add('active'); c.textContent = '🪱';
-    setTimeout(() => { c.classList.remove('active'); c.textContent = '🟤'; }, DIG.activeMs);
-  }, DIG.popMs);
+  digS = { dug: 0, timeLeft: DIG.time, worms: [], hoes: [], parts: [], marks: [], decor: makeDigDecor() };
+  $('dig-time').textContent = digS.timeLeft; $('dig-count').textContent = digS.dug;
+  const pop = setInterval(digSpawn, DIG.popMs);
   const tick = setInterval(() => {
-    timeLeft--; $('dig-time').textContent = timeLeft;
-    if (timeLeft <= 0) endDig();
+    if (!digS) { clearInterval(tick); return; }
+    digS.timeLeft--; $('dig-time').textContent = Math.max(0, digS.timeLeft);
+    if (digS.timeLeft <= 0) endDig();
   }, 1000);
-  grid.onclick = e => {
-    const c = e.target.closest('.dig-cell');
-    if (c && c.classList.contains('active')) {
-      const got = DIG.minYield + Math.floor(Math.random() * (DIG.maxYield - DIG.minYield + 1));
-      dug += got; $('dig-count').textContent = dug;
-      c.classList.remove('active'); c.textContent = '🟤';
-      Sfx.click();
-    }
-  };
   function endDig() {
     clearInterval(pop); clearInterval(tick);
+    const dug = digS ? digS.dug : 0; digS = null;
     if (dug > 0) { S.giun += dug; save(); toast('Đào được ' + dug + ' con giun! 🪱'); }
     else toast('Chưa đào được con nào...');
     updateHUD();
@@ -832,6 +899,7 @@ function onPress(e) {
     } else toast('Chạm vào 1 trong 3 điểm câu!');
   }
   else if (phase === 'CAST') { const p = canvasPos(e); doCast(p.x, p.y); }
+  else if (phase === 'DIG') { const p = canvasPos(e); digTap(p); }
   else if (phase === 'BITE') startStrike();       // nhấn sớm: vào luôn thanh nhịp
   else if (phase === 'STRIKE') { Sfx.click(); strikeJudge(); }
   else if (phase === 'FIGHT') holding = true;
@@ -1050,6 +1118,8 @@ document.addEventListener('click', e => {
 
 /* ---------- Vòng lặp chính ---------- */
 function update(dt) {
+  // Mini-game đào giun: animation cuốc, hạt đất, giun bay vào xô
+  if (phase === 'DIG') digUpdate(dt);
   // hạt nước
   for (let i = splashes.length - 1; i >= 0; i--) {
     const p = splashes[i];
@@ -1179,6 +1249,15 @@ function resumeFromCall() {
 }
 
 function render() {
+  // Mini-game đào giun: vẽ vườn đất trên canvas chính
+  if (phase === 'DIG' && digS) {
+    Art.drawDigGarden(ctx, {
+      W: L.W, H: L.H, t: tG,
+      worms: digS.worms, hoes: digS.hoes, parts: digS.parts, marks: digS.marks,
+      decor: digS.decor, bucket: digBucket(),
+    });
+    return;
+  }
   // vị trí phao theo phase
   let fdy = 0, tilt = 0, showFloat = ['WAIT', 'BITE', 'STRIKE', 'FIGHT'].includes(phase);
   let biteFlash = false, rodBend = 0;
@@ -1371,6 +1450,11 @@ window.__dbg = {
   fight: () => fight ? { tension: fight.tension, zc: fight.zc } : null,
   lb: () => ({ name: lbName(), totalEarned: S.totalEarned || 0, lbSent: S.lbSent || 0,
                biggestFish: S.biggestFish || 0 }),
+  dig: () => (typeof digS !== 'undefined' && digS ? {
+    dug: digS.dug, timeLeft: digS.timeLeft,
+    worms: digS.worms.filter(w => !w.caught).map(w => Art.wormHead(w, tG)),
+    hoes: digS.hoes.length, parts: digS.parts.length,
+  } : null),
 };
 
 })();
