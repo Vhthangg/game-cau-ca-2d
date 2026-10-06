@@ -253,10 +253,12 @@ function updateHUD() {
     bn.textContent = '🚫 BỊ CẤM CÂU — còn ' + banDaysLeft() + ' ngày! Vợ đang giận, đừng dại mà đi lén...';
     wb.disabled = true;
     pd.classList.toggle('hidden', (S.sincerity || 0) < 5);
+    renderBribe();
   } else {
     bn.classList.add('hidden');
     wb.disabled = false;
     pd.classList.add('hidden');
+    $('bribe-panel').classList.add('hidden');
   }
   updateQuestBadge();
 }
@@ -1157,6 +1159,36 @@ bindClick('btn-pardon', () => {
     Sfx.caught(); updateHUD();
   }
 });
+/* ---------- Chuộc lỗi khi bị cấm câu: dùng tiền nịnh vợ ---------- */
+function renderBribe() {
+  const p = $('bribe-panel');
+  if (!banned()) { p.classList.add('hidden'); return; }
+  p.classList.remove('hidden');
+  $('bribe-days').textContent = banDaysLeft();
+  $('bribe-susp').textContent = S.suspicion || 0;
+  $('bribe-list').innerHTML = BRIBE_GIFTS.map(g =>
+    '<div class="card"><div class="card-title">' + g.icon + ' ' + g.name + '</div>' +
+    '<div class="card-desc">' + g.desc + '</div>' +
+    '<button class="btn small" data-bribe="' + g.id + '"' + (S.money < g.price ? ' disabled' : '') +
+    '>Tặng ' + fmt(g.price) + '</button></div>').join('');
+  $('bribe-hint').classList.toggle('hidden', S.money >= BRIBE_GIFTS[0].price);
+}
+function buyBribe(id) {
+  const g = BRIBE_GIFTS.find(x => x.id === id);
+  if (!g || !banned()) return;
+  if (S.money < g.price) { toast('Không đủ tiền mua ' + g.name + '! 😅'); Sfx.fail(); return; }
+  S.money -= g.price;
+  S.suspicion = Math.max(0, (S.suspicion || 0) - g.down);
+  S.happiness = clamp((S.happiness || 0) + (g.happy || 0), 0, 100);
+  save(); Sfx.sell();
+  toast('💝 ' + funny(FUNNY_BRIBE) + ' (-' + g.down + ' nghi ngờ)');
+  if ((S.suspicion || 0) < 80 && banned()) {
+    S.banUntil = ''; save();
+    toast('🎉 Vợ nguôi giận rồi! Được đi câu tiếp — nhớ về sớm đấy!');
+    Sfx.caught();
+  }
+  renderBribe(); updateHUD();
+}
 bindClick('btn-to-quest', enterQuest);
 bindClick('btn-to-shop', enterShop);
 bindClick('btn-to-help', enterHelp);
@@ -1255,6 +1287,8 @@ document.addEventListener('click', e => {
   if (q) { Sfx.init(); Sfx.click(); claimQuest(q.dataset.qclaim); return; }
   const gf = e.target.closest('[data-gift]');
   if (gf) { Sfx.init(); Sfx.click(); buyWifeGift(gf.dataset.gift); return; }
+  const br = e.target.closest('[data-bribe]');
+  if (br) { Sfx.init(); Sfx.click(); buyBribe(br.dataset.bribe); return; }
   // Chọn đồ đựng cá mang theo (màn hình chuẩn bị, mode Trốn vợ)
   const dc = e.target.closest('[data-cont]');
   if (dc && S.containers.includes(dc.dataset.cont)) {
@@ -1635,6 +1669,7 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     get trip() { return trip; },
     level, mapUnlocked, ensureDailyQuests, questEvent, pickFish,
     addSuspicion, banned, banDaysLeft, buffActive, goWifeHome, offerFish,
+    bribe(id) { buyBribe(id); },
     goHomeNow() { goWifeHome(); },
     startWife() { startWifeTrip(); },
     setSave(patch) { Object.assign(S, patch); save(); },
