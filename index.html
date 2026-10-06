@@ -20,6 +20,9 @@
       <span id="hud-giun" class="pill">🪱 0</span>
       <span id="hud-cam" class="pill">🟤 0</span>
       <span id="hud-rod" class="pill">🎣 Cần tre</span>
+      <span id="hud-clock" class="pill hidden">🕐 15:00</span>
+      <span id="hud-susp" class="pill hidden">😒 0</span>
+      <span id="hud-buff" class="pill hidden">🍀</span>
       <button id="btn-home" class="icon-btn" title="Về menu chính">🏠</button>
     </div>
     <button id="btn-mute" class="icon-btn" title="Bật/tắt âm thanh">🔊</button>
@@ -30,7 +33,11 @@
         <h1>🎣 CÂU CÁ AO LÀNG</h1>
         <p class="subtitle">Game câu cá 2D Việt Nam — học câu thật qua từng thao tác</p>
         <p class="money-line">💰 <span id="menu-money">0đ</span> &nbsp;•&nbsp; ⭐ <span id="menu-level">Cấp 1</span></p>
-        <button id="btn-to-prepare" class="btn big primary">🎣 Đi câu</button>
+        <p id="menu-wife-line" class="wife-line hidden">😒 Nghi ngờ: <b id="menu-susp">0</b> &nbsp;•&nbsp; 😍 Hạnh phúc: <b id="menu-happy">0</b> &nbsp;•&nbsp; 🙏 Chân thành: <b id="menu-sincere">0</b></p>
+        <p id="ban-notice" class="ban-notice hidden"></p>
+        <button id="btn-to-prepare" class="btn big primary">🎣 Câu tự do</button>
+        <button id="btn-to-wife" class="btn big wife-btn">😎 Trốn vợ đi câu</button>
+        <button id="btn-pardon" class="btn big ghost hidden">🙏 Dùng 5 Chân thành xin tha</button>
         <button id="btn-to-quest" class="btn big">🎯 Nhiệm vụ ngày <span id="quest-badge" class="badge hidden"></span></button>
         <button id="btn-to-shop" class="btn big">Cửa hàng</button>
         <button id="btn-to-help" class="btn big ghost">Hướng dẫn</button>
@@ -125,6 +132,7 @@
           <li><b>Sông quê</b> (mở khi câu 15 con ở ao hoặc đạt cấp 2): chọn 1 trong 3 điểm câu — Bến đò (dễ), Gầm cầu (vừa), Bãi bồi (dòng xiết, khó). Mồi nhẹ ở chỗ xiết sẽ bị trôi, tỉ lệ cắn giảm!</li>
           <li><b>Thời tiết & giờ vàng:</b> sau mưa cá ăn mạnh hơn; 5–7h sáng và 16–18h là giờ vàng câu cá.</li>
           <li><b>Cấp cần thủ</b> tăng theo tổng số cá đã câu — mở khóa map và cần mới. <b>Nhiệm vụ ngày</b> cho thưởng mỗi ngày, đừng quên nhận!</li>
+          <li><b>😎 Trốn vợ đi câu:</b> vợ đặt <b>giờ giới nghiêm</b> mỗi chuyến (đồng hồ game chạy nhanh: 1 phút thật = 15 phút game). Về trễ +15 nghi ngờ mỗi 30 phút! Giữa chuyến vợ có thể <b>gọi điện kiểm tra</b> — nói thật hay nói dối là tùy bạn... Câu được cá thì chọn: <b>bán ngay</b> (có tiền nhưng +nghi ngờ), <b>mang về nịnh vợ</b> (giảm nghi ngờ khi dâng cá), hoặc <b>phóng sinh</b> tích phúc đức (đủ 10 điểm được buff "Cá lớn phù hộ"). Về nhà có thể <b>vào bếp</b> nấu ăn hoặc <b>mua quà</b> tặng vợ. Nghi ngờ ≥ 80 là <b>bị cấm câu 2 ngày</b>!</li>
         </ol>
         <button id="btn-help-back" class="btn">Đã hiểu!</button>
       </div>
@@ -138,10 +146,63 @@
         <p id="res-name" class="res-name"></p>
         <p id="res-weight"></p>
         <p id="res-price" class="money-line"></p>
-        <div class="row">
+        <p id="res-funny" class="funny-line hidden"></p>
+        <div class="row" id="res-row-free">
           <button id="btn-release" class="btn ghost">Thả cá</button>
           <button id="btn-sell" class="btn big">💰 Bán cá</button>
         </div>
+        <div class="choice-col hidden" id="res-row-wife">
+          <button id="btn-wife-sell" class="btn big">💰 Bán ngay</button>
+          <button id="btn-wife-gift" class="btn big gift">🎁 Mang về nịnh vợ</button>
+          <button id="btn-wife-release" class="btn big ghost">🙏 Phóng sinh</button>
+        </div>
+        <div class="row hidden" id="res-row-wife-done">
+          <button id="btn-wife-continue" class="btn big">Câu tiếp →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cuộc gọi bất ngờ của vợ -->
+    <div id="scr-call" class="screen hidden">
+      <div class="panel call-panel">
+        <div class="call-avatar">📱</div>
+        <h2 id="call-title">Vợ đang gọi...</h2>
+        <p id="call-text" class="call-text">"Đang ở đâu đấy?!"</p>
+        <div class="countdown"><i id="call-bar"></i></div>
+        <div id="call-answers" class="choice-col"></div>
+      </div>
+    </div>
+
+    <!-- Về nhà (mode Trốn vợ) -->
+    <div id="scr-wifehome" class="screen hidden">
+      <div class="panel wide">
+        <h2>🏠 Về nhà</h2>
+        <p class="subtitle">😒 Nghi ngờ: <b id="wh-susp">0</b> &nbsp;•&nbsp; 😍 Hạnh phúc: <b id="wh-happy">0</b></p>
+        <div id="wh-titles" class="titles"></div>
+        <h3>🧺 Giỏ cá mang về (<span id="wh-basket-n">0</span>)</h3>
+        <div id="wh-basket" class="cards"></div>
+        <div class="row">
+          <button id="btn-offer-fish" class="btn big gift">🎁 Dâng cá cho vợ</button>
+          <button id="btn-kitchen" class="btn big">👨‍🍳 Vào bếp nấu ăn</button>
+        </div>
+        <h3>🎁 Quà cho vợ</h3>
+        <div id="wh-gifts" class="cards"></div>
+        <h3>📅 Nhiệm vụ tuần</h3>
+        <div id="wh-weekly" class="week-card"></div>
+        <div class="row">
+          <button id="btn-wh-end" class="btn big primary">Kết thúc ngày →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mini-game Vào bếp -->
+    <div id="scr-kitchen" class="screen hidden">
+      <div class="panel">
+        <h2>👨‍🍳 Vào bếp nấu cá</h2>
+        <p>Chạm đúng <b>4 nguyên liệu</b>: 🐟 cá, 🥬 rau, 🫚 gừng, 🧂 muối!<br>
+        Còn <b id="kit-time">30</b>s — bấm sai trừ 3s!</p>
+        <div id="kitchen-grid"></div>
+        <button id="btn-kitchen-end" class="btn ghost">Bỏ cuộc</button>
       </div>
     </div>
 

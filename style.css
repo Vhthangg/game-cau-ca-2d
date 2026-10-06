@@ -248,3 +248,66 @@ html, body {
   .dig-cell.active { animation: none; }
   * { transition-duration: 0.01ms !important; }
 }
+
+/* ---- Đợt 2: Trốn vợ đi câu ---- */
+.wife-btn {
+  background: linear-gradient(180deg, #7b1fa2, #4a148c);
+  box-shadow: 0 3px 0 #2e0a5e, 0 0 0 3px rgba(123, 31, 162, .35);
+}
+.wife-line { color: var(--ink-soft); font-size: var(--fs-small); margin: 4px 0 8px; }
+.wife-line b { color: var(--earth-700); }
+.ban-notice {
+  background: #ffebee; border: 2px solid var(--danger); border-radius: var(--r-md);
+  color: var(--danger); font-weight: bold; padding: 10px; margin: 8px 0;
+  font-size: var(--fs-body);
+}
+.funny-line {
+  font-style: italic; color: var(--ink-soft); font-size: 15px; line-height: 1.6;
+  background: #fffdf4; border-left: 4px solid var(--sun-500);
+  padding: 8px 12px; border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  margin: 8px 0; text-align: left;
+}
+.choice-col { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-2) 0; }
+.choice-col .btn.big { margin: 0 auto; }
+.btn.gift {
+  background: linear-gradient(180deg, #ec407a, #c2185b);
+  box-shadow: 0 3px 0 #880e4f;
+}
+/* Cuộc gọi của vợ */
+.call-panel { border-color: #7b1fa2; }
+.call-avatar { font-size: 56px; animation: ring .5s ease-in-out infinite alternate; }
+@keyframes ring { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
+.call-text { font-size: 20px; font-weight: bold; color: var(--ink); margin: 8px 0; }
+.countdown { height: 10px; background: #e0e0e0; border-radius: 5px; overflow: hidden; margin: 10px 0; }
+.countdown i { display: block; height: 100%; background: linear-gradient(90deg, var(--sun-500), var(--danger)); width: 100%; }
+.call-q { font-size: 17px; font-weight: bold; margin: 8px 0; color: #4a148c; }
+/* Về nhà */
+.titles { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 6px 0; }
+.title-badge {
+  background: linear-gradient(180deg, #fff8e1, #ffecb3);
+  border: 2px solid var(--gold); border-radius: var(--r-pill);
+  padding: 4px 12px; font-size: var(--fs-small); font-weight: bold; color: #7a5c00;
+}
+.week-card {
+  background: var(--brand-100); border: 2px dashed var(--brand-500);
+  border-radius: var(--r-md); padding: 10px; font-size: 15px; line-height: 1.6;
+  margin: 6px 0;
+}
+/* Mini-game vào bếp */
+#kitchen-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2);
+  margin: var(--sp-3) auto; max-width: 380px;
+}
+.kit-cell {
+  aspect-ratio: 1; background: #fff3e0; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; cursor: pointer; border: 2px solid #ffcc80;
+  transition: transform 120ms ease, background-color var(--t-fast) ease;
+  min-height: 56px;
+}
+.kit-cell:active { transform: scale(.93); }
+.kit-cell.done { background: #c8e6c9; border-color: var(--brand-500); }
+.kit-cell.wrong { background: #ffcdd2; border-color: var(--danger); }
+/* HUD mode vợ */
+#hud-susp.hot { background: rgba(198, 40, 40, .9); border-color: #ff8a80; }
+#hud-buff { background: rgba(27, 94, 32, .9); }

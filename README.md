@@ -120,10 +120,34 @@ trong hàm `renderShop()`, thay `<a href="#">` bằng URL affiliate
 - [x] Cần máy spinning (2.4m / 3.0m bạo lực)
 - [x] Cấp độ cần thủ + Nhiệm vụ ngày
 
+### Đợt 2 ✅ — Trốn vợ đi câu 😎
+- **Chọn chế độ** ở menu chính: "🎣 Câu tự do" / "😎 Trốn vợ đi câu".
+- **Chuyến đi:** vợ đặt giờ giới nghiêm ngẫu nhiên 17h–19h (giờ game;
+  1 phút thật = 15 phút game, đồng hồ hiện trên HUD).
+- **Thanh Nghi ngờ (0–100):** +10 đi câu giờ lạ (sau 21h), +15 mỗi 30 phút
+  về trễ, +10 tiêu >5.000đ đồ câu/ngày, +40 nói dối bị phát hiện,
+  +5 bán cá giấu vợ. Về đúng giờ -5 + danh hiệu "Chồng ngoan".
+- **Cuộc gọi bất ngờ (60%/chuyến):** vợ gọi "Đang ở đâu đấy?!" —
+  5 giây chọn: nói thật (+10 nghi ngờ, +1 Chân thành) hoặc nói dối
+  ("Đang họp!" — 70% qua, 30% bị soi → trả lời câu hỏi mẹo, sai +40).
+- **3 lựa chọn sau khi câu được cá** (mỗi lựa chọn 1 câu hài ngẫu nhiên):
+  💰 Bán ngay (+tiền, +5 nghi ngờ), 🎁 Mang về nịnh vợ (vào giỏ),
+  🙏 Phóng sinh (+1 Phúc đức).
+- **Về nhà:** dâng cá cho vợ (-8/con, tối đa -30/chuyến, +10 Hạnh phúc/con),
+  mini-game "Vào bếp" 30s (thắng -20 nghi ngờ), shop "Quà cho vợ"
+  (trà sữa/hoa/son/túi xách tăng Hạnh phúc).
+- **Phúc đức:** đủ 10 điểm → buff "🍀 Cá lớn phù hộ" 1 giờ (+15% gặp cá to).
+- **Cấm câu:** nghi ngờ ≥ 80 → cấm 2 ngày thật (menu hiện đếm ngược);
+  đủ 5 Chân thành được xin tha một lần.
+- **Nhiệm vụ tuần:** T7–CN ở nhà với vợ → nghi ngờ reset về 20
+  + mở khóa Sông quê sớm (tự đánh giá vào đầu tuần).
+- Danh hiệu hài: Chồng ngoan, Vua giờ giới nghiêm, Người phóng sinh,
+  Chồng quốc dân...
+
 ### Tiếp theo
 - [ ] Mini-game cân phao, chọn điểm câu (ao làng)
 - [ ] Thêm map: suối, hồ, đập thủy điện, cửa sông
 - [ ] Thêm kỹ thuật: câu lure, câu lục, câu iso
-- [ ] Chế độ "Trốn vợ đi câu" 😄
+- [x] Chế độ "Trốn vợ đi câu" 😎 (Đợt 2)
 - [ ] Công thức trộn mồi, thời tiết/giờ cắn câu
 - [ ] Bảng xếp hạng, sự kiện giải câu cuối tuần

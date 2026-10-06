@@ -88,4 +88,85 @@ function fmt(n) { return Math.round(n).toLocaleString('vi-VN') + 'đ'; }
 function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
 function rnd(a, b) { return a + Math.random() * (b - a); }
 function todayStr() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function addDaysStr(ds, n) {
+  const p = ds.split('-').map(Number);
+  const d = new Date(p[0], p[1] - 1, p[2] + n);
+  return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+}
 function isGoldenHour() { const h = new Date().getHours(); return (h >= 5 && h < 7) || (h >= 16 && h < 18); }
+
+/* ===== Đợt 2: Trốn vợ đi câu ===== */
+
+// Câu hài khi bán cá trong mode Trốn vợ ({price} = số tiền bán được)
+const FUNNY_SELL = [
+  'Bán được {price}! Vợ hỏi tiền đâu... bảo là thưởng chuyên cần công ty 😎',
+  'Tiền bán cá giấu vào ví riêng — nghệ thuật quản lý tài chính gia đình 🎩',
+  '+{price} vào quỹ đen! Vợ mà biết thì... thôi đừng để vợ biết 🤫',
+  'Bán cá lấy tiền, tiền mua cần mới, cần mới câu cá to — vòng lặp hoàn hảo 🔄',
+  'Con cá này đổi được {price} — đủ mua bó hoa chuộc lỗi sau 😅',
+  'Bán ngay kẻo vợ thấy lại bảo mang về nấu... ơ mà nấu cũng ngon nhỉ? Thôi bán! 💸',
+  'Tiền tươi thóc thật! Cất kỹ vào túi quần đùi huyền thoại 👖',
+  '{price} về tay! Tối nay ngủ ngon, mai tính tiếp 😴',
+];
+// Câu hài khi mang cá về nịnh vợ
+const FUNNY_GIFT = [
+  'Để dành con này về nấu cho vợ — điểm cộng to đùng 😍',
+  'Cá ngon phải để vợ ăn trước, đó là đạo lý làm chồng 🐟',
+  'Mang về 1 con, vợ vui 1 tuần — đầu tư sinh lời nhất quả đất 📈',
+  'Con này mà chiên giòn thì vợ quên luôn chuyện mình đi câu lén 🤤',
+  '"Anh đi câu là để lo bữa tối cho em đó!" — câu này thuộc lòng rồi 💬',
+  'Giỏ cá đầy là bằng chứng yêu thương, không phải bằng chứng trốn vợ 😇',
+  'Vợ ăn ngon → chồng được đi câu tiếp. Triết lý đơn giản mà sâu sắc 🧠',
+];
+// Câu hài khi phóng sinh
+const FUNNY_RELEASE = [
+  'Thả em về với sông... kiếp sau đừng cắn câu anh nữa nhé 🙏',
+  'Phóng sinh tích đức — mai cá to tự tìm đến 🍀',
+  'Đi đi em, về kể với đàn cá là ở đây có ông chú tốt bụng 🐟',
+  'Thả 1 con hôm nay, mai câu được 10 con — luật nhân quả của cần thủ ⚖️',
+  'Nhẹ nhàng thôi... ừ, bơi đi, đừng quay đầu lại 👋',
+  'Phóng sinh xong thấy lòng thanh thản — chắc vợ cũng đang vui ở nhà 😌',
+  'Em tự do rồi! Nhớ rủ thêm bạn bè to con đến cắn câu anh nhé 😄',
+];
+function funny(arr, vars) {
+  let s = arr[Math.floor(Math.random() * arr.length)];
+  if (vars) for (const k in vars) s = s.split('{' + k + '}').join(vars[k]);
+  return s;
+}
+
+// Câu hỏi mẹo khi nói dối bị "soi" — answers: [{t, ok}]
+const TRICK_QS = [
+  { q: 'Thế sao mẹ nghe có tiếng nước ào ào?', answers: [
+    { t: 'À... vòi nước công ty bị rò!', ok: false },
+    { t: 'Em nghe nhầm đấy, anh đang ở quán cà phê!', ok: true } ] },
+  { q: 'Họp gì mà có tiếng chim hót?', answers: [
+    { t: 'Công ty mới lắp loa thiên nhiên cho đỡ stress!', ok: true },
+    { t: 'À... anh mở YouTube tiếng chim cho dễ ngủ!', ok: false } ] },
+  { q: 'Sao áo anh có mùi tanh thế?', answers: [
+    { t: 'Trưa nay ăn cá kho, dính vào áo!', ok: true },
+    { t: 'Mùi... nước hoa mới đó em!', ok: false } ] },
+  { q: 'Đang họp sao lại thở gấp thế?', answers: [
+    { t: 'Anh vừa chạy lên 5 tầng vì thang máy hỏng!', ok: true },
+    { t: 'Họp căng thẳng quá em ạ!', ok: false } ] },
+];
+
+// Quà tặng vợ trong shop "Quà cho vợ"
+const WIFE_GIFTS = [
+  { id: 'tra-sua', icon: '🧋', name: 'Trà sữa',   price: 300,  happy: 10, desc: 'Vợ cười tít mắt! Hạnh phúc +10 😍' },
+  { id: 'hoa',     icon: '💐', name: 'Bó hoa',     price: 500,  happy: 15, desc: 'Hoa đẹp như vợ! Hạnh phúc +15 🌸' },
+  { id: 'son',     icon: '💄', name: 'Son môi',    price: 800,  happy: 20, desc: 'Vợ thoa son đi chơi với bạn! Hạnh phúc +20 💃' },
+  { id: 'tui',     icon: '👜', name: 'Túi xách',   price: 2000, happy: 30, desc: 'Vợ ôm túi cười cả ngày! Hạnh phúc +30 🥰' },
+];
+
+// Nguyên liệu đúng cho mini-game "Vào bếp" (30s)
+const KITCHEN_GOOD = ['🐟', '🥬', '🫚', '🧂'];
+const KITCHEN_BAD  = ['🌶️', '🍋', '🧄', '🥥'];
+const KITCHEN_TIME = 30;
+
+const WIFE = {
+  startHour: 15,            // chuyến bắt đầu lúc 15h giờ game
+  deadlineMin: 17 * 60, deadlineMax: 19 * 60, // giờ giới nghiêm ngẫu nhiên
+  gameMinPerRealSec: 0.25, // 1 phút thật = 15 phút game
+  banDays: 2,
+  maxSuspicion: 100,
+};
