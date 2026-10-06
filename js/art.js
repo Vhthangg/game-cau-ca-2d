@@ -586,5 +586,198 @@ const Art = (function () {
     pill(ctx, 'GIỮ để kéo — THẢ để nhả. Đừng để đứt dây!', 480, 52);
   }
 
-  return { drawScene, drawFishIcon };
+  // ===== Mini-game đào giun: vườn đất =====
+  // o: { W,H,t,worms,hoes,parts,marks,decor,bucket }
+  // worm: { x,y,born,ph,caught,fly } ; hoe: { x,y,t0,dur,struck,worm }
+  function wormHead(w, t) {
+    const age = t - w.born;
+    const grow = Math.max(0, Math.min(1, (age - 0.10) / 0.25));
+    const len = 34 * grow, segs = 7;
+    const i = segs;
+    return {
+      x: w.x + Math.sin(t * 9 + w.ph + i * 0.75) * 5 * (i / segs),
+      y: w.y - (i + 1) * (len / segs),
+    };
+  }
+  function drawDigGarden(ctx, o) {
+    const W = o.W, H = o.H, t = o.t, portrait = H > W;
+    const soilY = portrait ? 120 : 78;
+    // --- Trời ---
+    const sky = ctx.createLinearGradient(0, 0, 0, soilY + 30);
+    sky.addColorStop(0, '#a5dcf5'); sky.addColorStop(1, '#e6f4df');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, soilY + 30);
+    // mặt trời
+    ctx.fillStyle = '#fff59d';
+    ctx.beginPath(); ctx.arc(W - 64, 42, 26, 0, 6.29); ctx.fill();
+    ctx.fillStyle = 'rgba(255,245,157,.35)';
+    ctx.beginPath(); ctx.arc(W - 64, 42, 38, 0, 6.29); ctx.fill();
+    // mây trôi nhẹ
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    for (let i = 0; i < 3; i++) {
+      const cx = ((i * 220 + t * 8) % (W + 160)) - 80, cy = 30 + i * 22;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 34, 14, 0, 0, 6.29);
+      ctx.ellipse(cx - 22, cy + 4, 22, 10, 0, 0, 6.29);
+      ctx.ellipse(cx + 24, cy + 5, 24, 11, 0, 0, 6.29);
+      ctx.fill();
+    }
+    // --- Nền đất ---
+    const soil = ctx.createLinearGradient(0, soilY, 0, H);
+    soil.addColorStop(0, '#9c7a5f'); soil.addColorStop(1, '#7a5b44');
+    ctx.fillStyle = soil; ctx.fillRect(0, soilY, W, H - soilY);
+    // luống xới: rãnh ngang
+    ctx.fillStyle = 'rgba(93,64,45,.45)';
+    for (let y = soilY + 26; y < H; y += 52) ctx.fillRect(0, y, W, 9);
+    ctx.fillStyle = 'rgba(255,235,200,.10)';
+    for (let y = soilY + 38; y < H; y += 52) ctx.fillRect(0, y, W, 4);
+    // vân đất
+    const dc = o.decor || {};
+    for (const d of (dc.dots || [])) {
+      ctx.fillStyle = d.l ? 'rgba(0,0,0,.10)' : 'rgba(255,240,210,.10)';
+      ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, 6.29); ctx.fill();
+    }
+    // ụ đất trang trí
+    for (const m of (dc.mounds || [])) {
+      ctx.fillStyle = '#6d4c41';
+      ctx.beginPath(); ctx.ellipse(m.x, m.y, m.r, m.r * 0.45, 0, 0, 6.29); ctx.fill();
+      ctx.fillStyle = 'rgba(255,235,200,.12)';
+      ctx.beginPath(); ctx.ellipse(m.x - m.r * 0.25, m.y - m.r * 0.14, m.r * 0.5, m.r * 0.2, 0, 0, 6.29); ctx.fill();
+    }
+    // sỏi
+    for (const p of (dc.pebbles || [])) {
+      ctx.fillStyle = '#9e9e9e';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, 6.29); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.25)';
+      ctx.beginPath(); ctx.ellipse(p.x - p.rx * 0.3, p.y - p.ry * 0.3, p.rx * 0.4, p.ry * 0.35, 0, 0, 6.29); ctx.fill();
+    }
+    // cỏ dại
+    for (const g of (dc.weeds || [])) {
+      ctx.strokeStyle = '#558b2f'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      for (let b = -2; b <= 2; b++) {
+        ctx.beginPath(); ctx.moveTo(g.x, g.y);
+        ctx.quadraticCurveTo(g.x + b * 4 * g.s, g.y - 10 * g.s, g.x + b * 6 * g.s, g.y - 16 * g.s);
+        ctx.stroke();
+      }
+    }
+    // hàng rào tre trên mép vườn
+    const postY = soilY + 6;
+    ctx.fillStyle = '#7a5c2e';
+    ctx.fillRect(0, postY - 26, W, 7); ctx.fillRect(0, postY - 12, W, 7);
+    ctx.fillStyle = 'rgba(255,255,255,.15)'; ctx.fillRect(0, postY - 26, W, 2);
+    for (let x = 24; x < W; x += 92) {
+      ctx.fillStyle = '#8a6d3b'; rr(ctx, x - 6, postY - 44, 12, 52, 5); ctx.fill();
+      ctx.fillStyle = '#6b5228';
+      ctx.fillRect(x - 6, postY - 30, 12, 3); ctx.fillRect(x - 6, postY - 16, 12, 3);
+    }
+    // cây chuối 2 góc
+    for (const bx of [26, W - 26]) {
+      ctx.strokeStyle = '#4e7a3a'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(bx, soilY + 2); ctx.lineTo(bx, soilY - 34); ctx.stroke();
+      ctx.fillStyle = '#66a34e';
+      for (let l = 0; l < 4; l++) {
+        const a = -0.5 - l * 0.5 + (bx < W / 2 ? 0 : 2.2);
+        ctx.save(); ctx.translate(bx, soilY - 34); ctx.rotate(a);
+        ctx.beginPath(); ctx.ellipse(34, 0, 36, 11, 0, 0, 6.29); ctx.fill(); ctx.restore();
+      }
+    }
+    // --- Xô đựng giun ---
+    const bk = o.bucket;
+    ctx.save();
+    ctx.fillStyle = '#8d6e63';
+    ctx.beginPath();
+    ctx.moveTo(bk.x - 20, bk.y - 16); ctx.lineTo(bk.x + 20, bk.y - 16);
+    ctx.lineTo(bk.x + 15, bk.y + 18); ctx.lineTo(bk.x - 15, bk.y + 18);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(bk.x - 20, bk.y - 16); ctx.lineTo(bk.x + 20, bk.y - 16); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bk.x - 17, bk.y - 2); ctx.lineTo(bk.x + 17, bk.y - 2); ctx.stroke();
+    ctx.strokeStyle = '#78909c'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(bk.x, bk.y - 16, 20, Math.PI, 0); ctx.stroke();
+    ctx.restore();
+    // --- Giun ---
+    for (const w of (o.worms || [])) {
+      const age = t - w.born;
+      if (w.caught) { // bị cuốc hất bay vào xô
+        const fp = Math.min(1, (t - w.fly) / 0.5);
+        const sx = w.x, syw = w.y - 16;
+        const mx = (sx + bk.x) / 2, my = Math.min(syw, bk.y) - 130;
+        const ix = (1 - fp) * (1 - fp) * sx + 2 * (1 - fp) * fp * mx + fp * fp * bk.x;
+        const iy = (1 - fp) * (1 - fp) * syw + 2 * (1 - fp) * fp * my + fp * fp * bk.y;
+        ctx.save(); ctx.globalAlpha = 1 - fp * 0.6;
+        ctx.translate(ix, iy); ctx.rotate(fp * 5);
+        ctx.strokeStyle = '#ef9aa5'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-10, 6); ctx.quadraticCurveTo(0, -8, 10, 4); ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      // ụ đất đội lên trước
+      if (age < 0.22) {
+        const g = Math.min(1, age / 0.15);
+        ctx.fillStyle = '#6d4c41';
+        ctx.beginPath(); ctx.ellipse(w.x, w.y, 14 * g, 7 * g, 0, 0, 6.29); ctx.fill();
+      }
+      const grow = Math.max(0, Math.min(1, (age - 0.10) / 0.25));
+      if (grow <= 0) continue;
+      const len = 34 * grow, segs = 7;
+      ctx.lineCap = 'round';
+      for (let i = segs; i >= 1; i--) {
+        const f0 = (i - 1) / segs, f1 = i / segs;
+        const x0 = w.x + Math.sin(t * 9 + w.ph + (i - 1) * 0.75) * 5 * f0;
+        const y0 = w.y - i * (len / segs);
+        const x1 = w.x + Math.sin(t * 9 + w.ph + i * 0.75) * 5 * f1;
+        const y1 = w.y - (i + 1) * (len / segs);
+        ctx.strokeStyle = (i % 2 === 0) ? '#d67b88' : '#ef9aa5';
+        ctx.lineWidth = 7 - (i / segs) * 4;
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      }
+      const hd = wormHead(w, t);
+      ctx.fillStyle = '#d16a7a';
+      ctx.beginPath(); ctx.arc(hd.x, hd.y, 4.2, 0, 6.29); ctx.fill();
+    }
+    // --- Cây cuốc bổ xuống ---
+    for (const h of (o.hoes || [])) {
+      const p = (t - h.t0) / h.dur;
+      if (p < 0 || p > 1.15) continue;
+      let ang;
+      if (p < 0.55) { const q = p / 0.55; ang = -1.05 + (0.30 + 1.05) * q * q; }
+      else { const q = Math.min(1, (p - 0.55) / 0.45); ang = 0.30 + (-0.25 - 0.30) * q; }
+      const px = h.x, py = h.y - 110, hl = 118;
+      const ex = px + Math.sin(ang) * hl, ey = py + Math.cos(ang) * hl;
+      ctx.save();
+      ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 9; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ex, ey); ctx.stroke();
+      // lưỡi cuốc
+      ctx.translate(ex, ey); ctx.rotate(ang + 0.5);
+      ctx.fillStyle = '#78909c';
+      ctx.beginPath();
+      ctx.moveTo(-4, 0); ctx.lineTo(16, 0); ctx.lineTo(22, 26); ctx.lineTo(2, 26);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#546e7a'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.restore();
+    }
+    // --- Hạt đất văng ---
+    for (const pt of (o.parts || [])) {
+      const a = Math.max(0, 1 - pt.life / pt.max);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.translate(pt.x, pt.y); ctx.rotate(pt.rot);
+      ctx.fillStyle = pt.c; ctx.fillRect(-pt.sz / 2, -pt.sz / 2, pt.sz, pt.sz);
+      ctx.restore();
+    }
+    // --- Vết cuốc bổ hụt ---
+    for (const m of (o.marks || [])) {
+      const q = (t - m.t0) / m.dur;
+      if (q < 0 || q > 1) continue;
+      ctx.save(); ctx.globalAlpha = 0.7 * (1 - q);
+      ctx.strokeStyle = '#4e342e'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      for (let k = 0; k < 3; k++) {
+        const a = -0.9 + k * 0.9;
+        ctx.beginPath(); ctx.moveTo(m.x, m.y);
+        ctx.lineTo(m.x + Math.cos(a) * 16, m.y + Math.sin(a) * 10 + 4);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  return { drawScene, drawFishIcon, drawDigGarden, wormHead };
 })();
