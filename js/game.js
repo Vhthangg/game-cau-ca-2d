@@ -176,7 +176,7 @@ let spot = null;              // điểm câu sông quê đang chọn (object RI
 let session = { weather: 'nang', golden: false }; // thời tiết & giờ vàng của phiên câu
 let trip = null;              // Đợt 2: chuyến "trốn vợ" — {gameMin, deadline, elapsed, callAt, willCall, called, resumePhase}
 let homeConfirmT = 0;         // đếm ngược xác nhận "về nhà" khi quá giờ
-let riskT = 0, overWarned = false, contShakeT = 0; // rủi ro đồ đựng: roll định kỳ, cảnh báo quá tải, rung rọ
+let riskT = 0, overWarned = false, contShakeT = 0; // rủi ro đồ đựng: roll định kỳ, cảnh báo quá tải, rung rọng
 let lastClockMin = -1;        // phút game đã hiển thị trên HUD (tránh ghi DOM mỗi frame)
 
 /* ---------- DOM helper ---------- */
@@ -790,7 +790,7 @@ function fightWin() {
 }
 // Cập nhật nút "Cho vào đồ đựng" theo sức chứa còn lại
 function renderWifeResult() {
-  // Luật sức chứa theo KG: thùng đầy cứng (disable), rọ/xô cho nhồi quá tải kèm rủi ro
+  // Luật sức chứa theo KG: thùng đầy cứng (disable), rọng/xô cho nhồi quá tải kèm rủi ro
   const c = contDef(), kg = keptKg(), load = contLoad();
   const btn = $('btn-wife-keep');
   btn.textContent = c.icon + ' Cho vào ' + c.name + ' (' + kg.toFixed(1) + '/' + c.cap + 'kg)';
@@ -798,7 +798,7 @@ function renderWifeResult() {
   if (c.id === 'thung') {
     const over = kg + lastWeight > c.cap + 1e-9;
     btn.disabled = over;
-    if (over) toast('🛢️ Thùng đã đầy — không nhét thêm được!');
+    if (over) toast('🧰 Thùng câu đã đầy — không nhét thêm được!');
   } else {
     btn.disabled = false;
     if (load > 1) {
@@ -814,7 +814,7 @@ function contRiskOnKeep(c) {
   if (load <= 1) return;
   if (!overWarned) {
     overWarned = true;
-    toast(c.id === 'ro' ? '⚠️ Rọ đã quá tải! Nhồi thêm có thể VỠ TOANG, xổng hết cá...'
+    toast(c.id === 'ro' ? '⚠️ Rọng đã quá tải! Nhồi thêm có thể VỠ TOANG, xổng hết cá...'
                         : '⚠️ Xô đã quá tải! Cá khỏe có thể nhảy ra ngoài...');
     Sfx.fail();
   }
@@ -835,7 +835,7 @@ function contRiskIdle() {
 function breakBasket() {
   const n = keptCount();
   S.keptFish = []; contShakeT = 1.2; save(); updateHUD();
-  toast('💥 Rọ vỡ toang! ' + n + ' con cá xổng hết rồi...');
+  toast('💥 Rọng vỡ toang! ' + n + ' con cá xổng hết rồi...');
   Sfx.fail();
 }
 function jumpOut(n, certain) {
@@ -1027,14 +1027,14 @@ function enterKitchen() {
 }
 
 /* ---------- Đồ đựng cá: popup xem + chạm trong scene ---------- */
-// Popup xem cá đang giữ — chạm vào xô/rọ/thùng trong scene (mode Trốn vợ)
+// Popup xem cá đang giữ — chạm vào xô/rọng/thùng trong scene (mode Trốn vợ)
 function enterContainer() {
   const c = contDef(), b = S.keptFish || [], kg = keptKg(), load = contLoad();
   const pct = Math.min(100, Math.round(load * 100));
   $('cont-title').textContent = c.icon + ' ' + c.name;
   $('cont-sub').textContent = 'Đang giữ ' + kg.toFixed(1) + '/' + c.cap + ' kg' +
     (load > 1 ? ' ⚠️ QUÁ TẢI!' : '') +
-    (c.place === 'water' ? ' — rọ ngập dưới nước, cá sống khỏe 🐟' : ' — để trên bờ');
+    (c.place === 'water' ? ' — rọng ngập dưới nước, cá sống khỏe 🐟' : ' — để trên bờ');
   const fill = $('cont-fill');
   if (fill) {
     fill.style.width = pct + '%';
@@ -1044,7 +1044,7 @@ function enterContainer() {
   if (warn) {
     warn.classList.toggle('hidden', load <= 1);
     if (load > 1) warn.textContent = c.id === 'ro'
-      ? '⚠️ Rọ quá tải — nhồi thêm có thể VỠ, xổng hết cá!'
+      ? '⚠️ Rọng quá tải — nhồi thêm có thể VỠ, xổng hết cá!'
       : '⚠️ Xô quá tải — cá khỏe có thể nhảy ra ngoài!';
   }
   $('cont-list').innerHTML = b.length
@@ -1188,10 +1188,10 @@ bindClick('btn-sell', () => {
 // Mode Trốn vợ: cho cá vào đồ đựng (KHÔNG bán ngay ở bờ — về nhà mới Bán/Dâng/Nấu)
 // Cho cá vào đồ đựng (dùng chung cho nút UI và test)
 function keepFishToContainer() {
-  // Thùng: tải cứng — không nhồi thêm. Rọ/Xô: cho nhồi quá tải nhưng roll rủi ro.
+  // Thùng: tải cứng — không nhồi thêm. Rọng/Xô: cho nhồi quá tải nhưng roll rủi ro.
   const c = contDef();
   if (c.id === 'thung' && keptKg() + lastWeight > c.cap + 1e-9) {
-    toast('🛢️ Thùng đã đầy — không nhét thêm được!'); Sfx.fail(); return false;
+    toast('🧰 Thùng câu đã đầy — không nhét thêm được!'); Sfx.fail(); return false;
   }
   S.keptFish.push({ fishId: fish.id, name: fish.name, weight: lastWeight, price: lastPrice });
   save();
@@ -1488,12 +1488,12 @@ function render() {
   Art.drawScene(ctx, tG, {
     W: L.W, H: L.H,
     map: S.map,
-    // Đồ đựng cá (mode Trốn vợ): vẽ xô/thùng trên bờ, rọ ở mép nước
+    // Đồ đựng cá (mode Trốn vợ): vẽ xô/thùng câu trên bờ, rọng lưới ở mép nước
     container: (function () {
       if (S.mode !== 'wife' || !isFishing()) return null;
       const cp = containerPos();
       const shx = contShakeT > 0 ? Math.sin(tG * 40) * 7 * contShakeT : 0;
-      return { id: S.activeContainer, x: cp.x + shx, y: cp.y };
+      return { id: S.activeContainer, x: cp.x + shx, y: cp.y, load: contLoad() };
     })(),
     float: showFloat ? { x: fx, y: fy, show: true, dy: fdy, tilt } : { show: false },
     rodBend, splashes, biteFlash,
