@@ -24,23 +24,23 @@ const RODS = [
 // map: 'ao' | 'song'. bait: mồi ưa thích ('giun' | 'cam') — dùng đúng mồi tỉ lệ cắn +25%.
 const FISH = [
   // --- Ao làng (MVP) ---
-  { id: 'ro-phi',    name: 'Rô phi',    min: 0.2, max: 0.8, price: 18000, pattern: 'nhap2',    diff: 0.25, w: 3, color: '#5b7fa6', big: false, map: 'ao', bait: 'giun' },
-  { id: 'ro-dong',   name: 'Rô đồng',   min: 0.1, max: 0.4, price: 21000, pattern: 'nhap3',    diff: 0.20, w: 3, color: '#7a8c5f', big: false, map: 'ao', bait: 'giun' },
-  { id: 'sac',       name: 'Cá sặc',    min: 0.1, max: 0.3, price: 24000, pattern: 'chimcham', diff: 0.15, w: 3, color: '#c2a15a', big: false, map: 'ao', bait: 'giun' },
-  { id: 'dieu-hong', name: 'Diêu hồng', min: 0.3, max: 1.2, price: 27000, pattern: 'nhap1',    diff: 0.30, w: 2, color: '#d4697e', big: false, map: 'ao', bait: 'cam' },
-  { id: 'chep',      name: 'Cá chép',   min: 0.5, max: 2.5, price: 36000, pattern: 'day',      diff: 0.45, w: 2, color: '#c98a3d', big: false, map: 'ao', bait: 'cam' },
-  { id: 'chim',      name: 'Cá chim',   min: 0.5, max: 2.0, price: 33000, pattern: 'dotngot',  diff: 0.55, w: 2, color: '#8e8e93', big: true,  map: 'ao', bait: 'cam' },
-  { id: 'tre-fish',  name: 'Cá trê',    min: 0.4, max: 3.0, price: 42000, pattern: 'rung',     diff: 0.50, w: 1, color: '#4a4a52', big: true,  map: 'ao', bait: 'giun' },
-  { id: 'tai-tuong', name: 'Tai tượng', min: 0.8, max: 4.0, price: 48000, pattern: 'loi',      diff: 0.70, w: 1, color: '#6d7f5e', big: true,  map: 'ao', bait: 'giun' },
+  { id: 'ro-phi',    name: 'Rô phi',    min: 0.2, max: 0.8, price: 18000, pattern: 'nhap2',    diff: 0.25, w: 3, color: '#5b7fa6', big: false, map: 'ao', bait: 'giun', escape: 0.25 },
+  { id: 'ro-dong',   name: 'Rô đồng',   min: 0.1, max: 0.4, price: 21000, pattern: 'nhap3',    diff: 0.20, w: 3, color: '#7a8c5f', big: false, map: 'ao', bait: 'giun', escape: 0.12 },
+  { id: 'sac',       name: 'Cá sặc',    min: 0.1, max: 0.3, price: 24000, pattern: 'chimcham', diff: 0.15, w: 3, color: '#c2a15a', big: false, map: 'ao', bait: 'giun', escape: 0.10 },
+  { id: 'dieu-hong', name: 'Diêu hồng', min: 0.3, max: 1.2, price: 27000, pattern: 'nhap1',    diff: 0.30, w: 2, color: '#d4697e', big: false, map: 'ao', bait: 'cam', escape: 0.30 },
+  { id: 'chep',      name: 'Cá chép',   min: 0.5, max: 2.5, price: 36000, pattern: 'day',      diff: 0.45, w: 2, color: '#c98a3d', big: false, map: 'ao', bait: 'cam', escape: 0.40 },
+  { id: 'chim',      name: 'Cá chim',   min: 0.5, max: 2.0, price: 33000, pattern: 'dotngot',  diff: 0.55, w: 2, color: '#8e8e93', big: true,  map: 'ao', bait: 'cam', escape: 0.55 },
+  { id: 'tre-fish',  name: 'Cá trê',    min: 0.4, max: 3.0, price: 42000, pattern: 'rung',     diff: 0.50, w: 1, color: '#4a4a52', big: true,  map: 'ao', bait: 'giun', escape: 0.65 },
+  { id: 'tai-tuong', name: 'Tai tượng', min: 0.8, max: 4.0, price: 48000, pattern: 'loi',      diff: 0.70, w: 1, color: '#6d7f5e', big: true,  map: 'ao', bait: 'giun', escape: 0.55 },
   // --- Sông quê (Đợt 1) ---
-  { id: 'nganh',      name: 'Cá ngạnh',   min: 0.5, max: 3.0, price: 36000, pattern: 'nganh2',   diff: 0.60, w: 2, color: '#8a6d3b', big: true,  map: 'song', bait: 'giun' },
-  { id: 'thac-lac',   name: 'Cá thác lác',min: 0.3, max: 1.2, price: 42000, pattern: 'loinhanh', diff: 0.40, w: 2, color: '#b8c4a8', big: false, map: 'song', bait: 'giun' },
-  { id: 'basa',       name: 'Cá basa',    min: 1.0, max: 6.0, price: 24000, pattern: 'chimcham', diff: 0.40, w: 2, color: '#9fb3c8', big: true,  map: 'song', bait: 'cam' },
-  { id: 'lang-song',  name: 'Cá lăng',    min: 1.0, max: 8.0, price: 39000, pattern: 'dotngot',  diff: 0.75, w: 1, color: '#5a5a6e', big: true,  map: 'song', bait: 'giun' },
-  { id: 'tra',        name: 'Cá tra',     min: 1.0, max: 5.0, price: 21000, pattern: 'rungdeu',  diff: 0.40, w: 2, color: '#7d8fa3', big: true,  map: 'song', bait: 'cam' },
-  { id: 'ca-he',      name: 'Cá he',      min: 0.2, max: 0.8, price: 18000, pattern: 'nhapnhe',  diff: 0.20, w: 3, color: '#c9b458', big: false, map: 'song', bait: 'cam' },
-  { id: 'bong-tuong', name: 'Bống tượng', min: 0.2, max: 1.0, price: 45000, pattern: 'hut',      diff: 0.40, w: 2, color: '#6b5b45', big: false, map: 'song', bait: 'giun' },
-  { id: 'ca-chot',    name: 'Cá chốt',    min: 0.1, max: 0.5, price: 15000, pattern: 'runtan',    diff: 0.20, w: 3, color: '#8c8c88', big: false, map: 'song', bait: 'giun' },
+  { id: 'nganh',      name: 'Cá ngạnh',   min: 0.5, max: 3.0, price: 36000, pattern: 'nganh2',   diff: 0.60, w: 2, color: '#8a6d3b', big: true,  map: 'song', bait: 'giun', escape: 0.60 },
+  { id: 'thac-lac',   name: 'Cá thác lác',min: 0.3, max: 1.2, price: 42000, pattern: 'loinhanh', diff: 0.40, w: 2, color: '#b8c4a8', big: false, map: 'song', bait: 'giun', escape: 0.45 },
+  { id: 'basa',       name: 'Cá basa',    min: 1.0, max: 6.0, price: 24000, pattern: 'chimcham', diff: 0.40, w: 2, color: '#9fb3c8', big: true,  map: 'song', bait: 'cam', escape: 0.45 },
+  { id: 'lang-song',  name: 'Cá lăng',    min: 1.0, max: 8.0, price: 39000, pattern: 'dotngot',  diff: 0.75, w: 1, color: '#5a5a6e', big: true,  map: 'song', bait: 'giun', escape: 0.75 },
+  { id: 'tra',        name: 'Cá tra',     min: 1.0, max: 5.0, price: 21000, pattern: 'rungdeu',  diff: 0.40, w: 2, color: '#7d8fa3', big: true,  map: 'song', bait: 'cam', escape: 0.50 },
+  { id: 'ca-he',      name: 'Cá he',      min: 0.2, max: 0.8, price: 18000, pattern: 'nhapnhe',  diff: 0.20, w: 3, color: '#c9b458', big: false, map: 'song', bait: 'cam', escape: 0.18 },
+  { id: 'bong-tuong', name: 'Bống tượng', min: 0.2, max: 1.0, price: 45000, pattern: 'hut',      diff: 0.40, w: 2, color: '#6b5b45', big: false, map: 'song', bait: 'giun', escape: 0.25 },
+  { id: 'ca-chot',    name: 'Cá chốt',    min: 0.1, max: 0.5, price: 15000, pattern: 'runtan',    diff: 0.20, w: 3, color: '#8c8c88', big: false, map: 'song', bait: 'giun', escape: 0.15 },
 ];
 
 // Mồi: wait = thời gian chờ cắn (giây), w = trọng lượng (mồi nặng ít bị trôi)
@@ -103,14 +103,57 @@ function isGoldenHour() { const h = new Date().getHours(); return (h >= 5 && h <
    Luật: câu được cá ở mode vợ KHÔNG bán ngay ở bờ — chỉ "Cho vào đồ đựng"
    hoặc "Phóng sinh". Về nhà mới được Bán hết / Dâng vợ / Nấu ăn.
    (Chế độ Câu tự do giữ nguyên: bán ngay ở bờ.) */
+// Đồ đựng cá (mode Trốn vợ) — sức chứa tính theo KG (cap), vì cá nhiều cỡ.
+// Rọ: chứa nhiều nhất nhưng QUÁ TẢI có thể VỠ (vượt 150% tải → vỡ chắc chắn, xổng hết).
+// Xô: quá tải cá KHỎE có thể NHẢY RA (vượt 130% → chắc chắn vài con nhảy, không xổng hết).
+// Thùng: không bao giờ hỏng/xổng nhưng tải CỨNG — không nhồi thêm được.
 const CONTAINERS = [
-  { id: 'xo',    name: 'Xô ghẻ',   cap: 5,  price: 0,     place: 'bank',
-    icon: '🪣', desc: 'Xô cũ mèm — để trên bờ. Chứa tối đa 5 con.' },
-  { id: 'ro',    name: 'Rọ cá',    cap: 12, price: 15000,  place: 'water',
-    icon: '🧺', desc: 'Rọ tre thả cạnh bờ, ngập xuống nước — cá sống khỏe. Chứa 12 con.' },
-  { id: 'thung', name: 'Thùng cá', cap: 25, price: 50000,  place: 'bank',
-    icon: '🛢️', desc: 'Thùng nhựa to để trên bờ. Chứa 25 con.' },
+  { id: 'xo',    name: 'Xô ghẻ',   cap: 6,  price: 0,     place: 'bank',
+    icon: '🪣', desc: 'Xô cũ mèm — để trên bờ. Chứa 6kg. Quá tải: cá khỏe có thể nhảy ra!' },
+  { id: 'ro',    name: 'Rọ cá',    cap: 18, price: 15000,  place: 'water',
+    icon: '🧺', desc: 'Rọ tre thả cạnh bờ, ngập xuống nước — cá sống khỏe. Chứa 18kg. Quá tải: RỌ CÓ THỂ VỠ, xổng hết cá!' },
+  { id: 'thung', name: 'Thùng cá', cap: 30, price: 50000,  place: 'bank',
+    icon: '🛢️', desc: 'Thùng nhựa to để trên bờ. Chứa 30kg, không bao giờ hỏng — nhưng đầy là hết chỗ.' },
 ];
+// ===== Rủi ro đồ đựng cá — hàm thuần (không DOM), test được bằng node =====
+// load = tổng kg đang giữ / cap. Mọi công thức ghi rõ để dễ cân bằng.
+function contLoadKg(keptKg, cap) { return cap > 0 ? keptKg / cap : 0; }
+// Mức rủi ro hiện tại: 'ok' | 'risk' | 'break' (rọ ≥150%: vỡ chắc chắn)
+//                      'jump-many' (xô ≥130%: chắc chắn vài con nhảy) | 'full' (thùng)
+function contRiskLevel(id, load) {
+  if (load <= 1) return 'ok';
+  if (id === 'ro') return load >= 1.5 ? 'break' : 'risk';
+  if (id === 'xo') return load >= 1.3 ? 'jump-many' : 'risk';
+  return 'full';
+}
+// Tỉ lệ VỠ RỌ khi cho thêm cá lúc quá tải. load≥1.5 → 1 (chắc chắn vỡ).
+// Công thức: 10% + 160% × (độ vượt tải). Vd tải 110% → 26%, 125% → 50%, 140% → 74%.
+function roBreakChance(load) {
+  if (load >= 1.5) return 1;
+  if (load <= 1) return 0;
+  return Math.min(0.9, 0.10 + (load - 1) * 1.6);
+}
+// Tỉ lệ CÓ CÁ NHẢY KHỎI XÔ khi cho thêm cá lúc quá tải (mất 1 con khỏe nhất).
+// Công thức: 15% + 200% × (độ vượt tải). Vd tải 110% → 35%, 120% → 55%.
+function xoJumpChance(load) {
+  if (load <= 1) return 0;
+  return Math.min(0.85, 0.15 + (load - 1) * 2.0);
+}
+// Roll định kỳ mỗi 30s lúc WAIT khi đang quá tải — nhẹ hơn roll lúc cho cá vào.
+function contIdleChance(id, load) {
+  if (load <= 1) return 0;
+  if (id === 'ro') return Math.min(0.5, (load - 1) * 0.8);
+  if (id === 'xo') return Math.min(0.6, (load - 1) * 1.2);
+  return 0;
+}
+function fishEscape(fishId) { const f = FISH.find(x => x.id === fishId); return f ? (f.escape || 0) : 0; }
+// Chọn n con khỏe nhất để nhảy ra (escape cao nhất + nhiễu nhẹ cho tự nhiên)
+function pickJumpers(kept, n) {
+  return kept
+    .map((f, i) => ({ f: f, i: i, s: (fishEscape(f.fishId) || 0) + Math.random() * 0.15 }))
+    .sort((a, b) => b.s - a.s)
+    .slice(0, Math.max(0, Math.min(n, kept.length)));
+}
 function containerById(id) { return CONTAINERS.find(c => c.id === id) || CONTAINERS[0]; }
 
 // Câu hài khi cho cá vào đồ đựng (mode Trốn vợ)
