@@ -39,6 +39,7 @@
         <button id="btn-to-wife" class="btn big wife-btn">😎 Trốn vợ đi câu</button>
         <button id="btn-pardon" class="btn big ghost hidden">🙏 Dùng 5 Chân thành xin tha</button>
         <button id="btn-to-quest" class="btn big">🎯 Nhiệm vụ ngày <span id="quest-badge" class="badge hidden"></span></button>
+        <button id="btn-to-leaderboard" class="btn big">🏆 Bảng xếp hạng</button>
         <button id="btn-to-shop" class="btn big">Cửa hàng</button>
         <button id="btn-to-help" class="btn big ghost">Hướng dẫn</button>
       </div>
@@ -63,6 +64,34 @@
         <div id="quest-list" class="cards"></div>
         <div class="row">
           <button id="btn-quest-back" class="btn ghost">← Quay lại</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bảng xếp hạng -->
+    <div id="scr-leaderboard" class="screen hidden">
+      <div class="panel wide">
+        <h2>🏆 Bảng xếp hạng</h2>
+        <p class="subtitle">Tổng tiền bán cá tích lũy mọi thời đại — ai là đại gia làng câu?</p>
+        <p id="lb-me" class="lb-me hidden"></p>
+        <div id="lb-status" class="lb-status">⏳ Đang tải bảng xếp hạng...</div>
+        <div id="lb-list" class="lb-list"></div>
+        <div class="row">
+          <button id="btn-lb-name" class="btn small">✏️ Đổi tên</button>
+          <button id="btn-lb-reload" class="btn small">🔄 Tải lại</button>
+          <button id="btn-lb-back" class="btn ghost">← Quay lại</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nhập tên cần thủ -->
+    <div id="scr-name" class="screen hidden">
+      <div class="panel">
+        <h2>🎣 Tên cần thủ</h2>
+        <p class="subtitle">Tên này sẽ hiển thị trên bảng xếp hạng toàn server.</p>
+        <input id="lb-name-input" class="text-input" maxlength="20" placeholder="Nhập tên của bạn..." autocomplete="off">
+        <div class="row">
+          <button id="btn-name-ok" class="btn big primary">Xong</button>
         </div>
       </div>
     </div>

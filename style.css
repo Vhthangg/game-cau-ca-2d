@@ -374,3 +374,40 @@ html, body {
   /* Popup kết quả: nút xếp dọc full-width cho ngón tay */
   #pop-result .panel { max-width: 100%; }
 }
+
+/* ============ Bảng xếp hạng ============ */
+.lb-status { color: var(--muted); font-size: 15px; margin: 10px 0; line-height: 1.6; }
+.lb-me {
+  background: var(--brand-100); border: 2px solid var(--brand-500); border-radius: var(--r-md);
+  padding: 10px 12px; font-size: 15px; line-height: 1.6; margin: 8px 0; text-align: left;
+}
+.lb-list {
+  display: flex; flex-direction: column; gap: 8px; margin: 8px 0;
+  max-height: 46vh; overflow-y: auto; padding: 2px;
+}
+.lb-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 2px solid var(--earth-200); border-radius: var(--r-md);
+  padding: 8px 12px; min-height: 56px; text-align: left;
+}
+.lb-row.lb-me-row {
+  border-color: var(--sun-500); background: #fffdf4;
+  box-shadow: 0 0 0 2px rgba(249, 168, 37, .25);
+}
+.lb-pos { font-size: 24px; min-width: 38px; text-align: center; flex: 0 0 auto; }
+.lb-rank {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; border-radius: 50%;
+  background: #eceff1; color: var(--ink-soft); font-size: 14px; font-weight: bold;
+}
+.lb-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lb-who b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-who small { color: var(--muted); font-size: 12px; }
+.lb-score { font-weight: bold; color: var(--gold); font-size: 16px; white-space: nowrap; flex: 0 0 auto; }
+.text-input {
+  width: 100%; max-width: 320px; margin: 8px auto; display: block;
+  min-height: 48px; padding: 10px 14px; font-size: 17px;
+  border: 2px solid var(--earth-500); border-radius: var(--r-md);
+  background: #fff; color: var(--ink); text-align: center;
+}
+.text-input:focus { outline: 3px solid var(--sun-500); border-color: var(--brand-500); }
