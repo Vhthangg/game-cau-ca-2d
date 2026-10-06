@@ -111,6 +111,61 @@ const Art = (function () {
     ctx.restore();
   }
 
+  // --- Đồ đựng cá (mode Trốn vợ): xô/thùng trên bờ, rọ nổi lập lờ ở mép nước ---
+  // x,y: điểm đặt (đáy đồ đựng). Vẽ tại đúng tọa độ game.js truyền sang để khớp vùng chạm.
+  function drawContainer(ctx, t, id, x, y) {
+    if (id === 'ro') {
+      // Rọ tre tròn, nửa chìm, lập lờ theo sóng
+      const cy = y + Math.sin(t * 2.2) * 5;
+      ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(x, cy + 16, 34, 8, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(x, cy + 16, 46, 12, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#8a5a2b';
+      ctx.beginPath(); ctx.ellipse(x, cy, 30, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a9743b';
+      ctx.beginPath(); ctx.ellipse(x, cy, 30, 22, 0, Math.PI, 0); ctx.fill();
+      ctx.strokeStyle = 'rgba(70,45,20,.55)'; ctx.lineWidth = 2;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath(); ctx.moveTo(x + i * 11, cy - 21); ctx.lineTo(x + i * 13, cy + 4); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.ellipse(x, cy - 2, 30, 8, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#6b4a26';
+      ctx.beginPath(); ctx.ellipse(x, cy - 20, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
+      // dây buộc về phía bờ
+      ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x, cy - 24); ctx.quadraticCurveTo(x + 34, cy - 58, x + 72, cy - 40); ctx.stroke();
+      return;
+    }
+    if (id === 'thung') {
+      // Thùng nhựa xanh to, có nắp
+      ctx.fillStyle = '#1565c0'; rr(ctx, x - 26, y - 52, 52, 52, 8); ctx.fill();
+      ctx.fillStyle = '#0d47a1';
+      rr(ctx, x - 26, y - 32, 52, 10, 4); ctx.fill();
+      rr(ctx, x - 26, y - 14, 52, 10, 4); ctx.fill();
+      ctx.fillStyle = '#90caf9'; rr(ctx, x - 26, y - 58, 52, 10, 5); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(x - 20, y - 50, 8, 46);
+      return;
+    }
+    // Xô ghẻ mặc định: xô tôn cũ màu xám, hơi móp
+    ctx.fillStyle = '#9e9e9e';
+    ctx.beginPath();
+    ctx.moveTo(x - 19, y - 34); ctx.lineTo(x + 19, y - 34);
+    ctx.lineTo(x + 14, y); ctx.lineTo(x - 14, y);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#616161'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x - 19, y - 34); ctx.lineTo(x + 19, y - 34); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,.15)';
+    ctx.beginPath(); ctx.ellipse(x - 6, y - 16, 6, 9, 0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#616161'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y - 34, 19, Math.PI, 0); ctx.stroke();
+  }
+  // Xô đỏ trang trí cũ (mode tự do) — giữ nguyên hình dáng quen thuộc
+  function drawDecoBucket(ctx, x, y) {
+    ctx.fillStyle = '#c62828'; rr(ctx, x, y, 34, 30, 4); ctx.fill();
+    ctx.strokeStyle = '#7f0000'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x + 17, y, 17, Math.PI, 0); ctx.stroke();
+  }
+
   // Vẽ toàn cảnh. v = {t, map, float, rodBend, splashes, strike, fight, castHint, maxCastX, hint, spots, spotHint, W, H}
   function drawScene(ctx, t, v) {
     const W = v.W || 960, H = v.H || 540;
@@ -191,10 +246,9 @@ const Art = (function () {
         ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.quadraticCurveTo(g.x + k * 4, g.y - 8, g.x + k * 7, g.y - 12); ctx.stroke();
       }
     });
-    // cái xô đỏ
-    ctx.fillStyle = '#c62828'; rr(ctx, 690, 492, 34, 30, 4); ctx.fill();
-    ctx.strokeStyle = '#7f0000'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(707, 492, 17, Math.PI, 0); ctx.stroke();
+    // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
+    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y);
+    else drawDecoBucket(ctx, 690, 492);
 
     drawOverlay(ctx, t, v);
   }
@@ -267,10 +321,9 @@ const Art = (function () {
         ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.quadraticCurveTo(g.x + k * 4, g.y - 8, g.x + k * 7, g.y - 12); ctx.stroke();
       }
     });
-    // cái xô đỏ
-    ctx.fillStyle = '#c62828'; rr(ctx, 690, 492, 34, 30, 4); ctx.fill();
-    ctx.strokeStyle = '#7f0000'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(707, 492, 17, Math.PI, 0); ctx.stroke();
+    // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
+    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y);
+    else drawDecoBucket(ctx, 690, 492);
 
     // --- Điểm câu (phase chọn điểm) ---
     (v.spots || []).forEach(s => {
@@ -433,10 +486,9 @@ const Art = (function () {
       }
     });
     drawAngler(ctx, 150, 915);
-    // cái xô đỏ
-    ctx.fillStyle = '#c62828'; rr(ctx, 420, 868, 34, 30, 4); ctx.fill();
-    ctx.strokeStyle = '#7f0000'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(437, 868, 17, Math.PI, 0); ctx.stroke();
+    // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
+    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y);
+    else drawDecoBucket(ctx, 420, 868);
 
     drawOverlay(ctx, t, v);
   }
