@@ -866,6 +866,7 @@ bindClick('btn-release', () => {
 $('btn-mute').addEventListener('click', () => {
   Sfx.init();
   Sfx.muted = !Sfx.muted; S.muted = Sfx.muted; save();
+  Music.setMuted(Sfx.muted);   // tắt/mở cả nhạc nền lẫn hiệu ứng
   $('btn-mute').textContent = Sfx.muted ? '🔇' : '🔊';
 });
 $('btn-mute').textContent = Sfx.muted ? '🔇' : '🔊';
@@ -1166,5 +1167,12 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
 
 enterMenu();
 requestAnimationFrame(loop);
+
+// Hook cho automated test (chỉ đọc state, không ảnh hưởng gameplay)
+window.__dbg = {
+  phase: () => phase,
+  strike: () => strike ? { pos: strike.pos, zc: strike.zc, zw: strike.zw } : null,
+  fight: () => fight ? { tension: fight.tension, zc: fight.zc } : null,
+};
 
 })();

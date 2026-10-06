@@ -99,7 +99,7 @@ html, body {
 .icon-btn:hover { background: rgba(35, 60, 48, .9); }
 .icon-btn:active { transform: scale(.9); }
 .icon-btn:focus-visible { outline: 3px solid var(--sun-500); outline-offset: 2px; }
-#btn-mute { position: absolute; top: var(--sp-2); right: var(--sp-2); }
+#btn-mute { position: absolute; top: var(--sp-2); right: var(--sp-2); z-index: 30; }
 #hud #btn-home { margin-left: auto; }
 
 /* ---- Gợi ý xoay màn hình (mobile dọc) ---- */
