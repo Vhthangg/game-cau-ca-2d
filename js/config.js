@@ -104,16 +104,16 @@ function isGoldenHour() { const h = new Date().getHours(); return (h >= 5 && h <
    hoặc "Phóng sinh". Về nhà mới được Bán hết / Dâng vợ / Nấu ăn.
    (Chế độ Câu tự do giữ nguyên: bán ngay ở bờ.) */
 // Đồ đựng cá (mode Trốn vợ) — sức chứa tính theo KG (cap), vì cá nhiều cỡ.
-// Rọ: chứa nhiều nhất nhưng QUÁ TẢI có thể VỠ (vượt 150% tải → vỡ chắc chắn, xổng hết).
+// Rọng: chứa nhiều nhất nhưng QUÁ TẢI có thể VỠ (vượt 150% tải → vỡ chắc chắn, xổng hết).
 // Xô: quá tải cá KHỎE có thể NHẢY RA (vượt 130% → chắc chắn vài con nhảy, không xổng hết).
-// Thùng: không bao giờ hỏng/xổng nhưng tải CỨNG — không nhồi thêm được.
+// Thùng câu: không bao giờ hỏng/xổng nhưng tải CỨNG — không nhồi thêm được.
 const CONTAINERS = [
   { id: 'xo',    name: 'Xô ghẻ',   cap: 6,  price: 0,     place: 'bank',
     icon: '🪣', desc: 'Xô cũ mèm — để trên bờ. Chứa 6kg. Quá tải: cá khỏe có thể nhảy ra!' },
-  { id: 'ro',    name: 'Rọ cá',    cap: 18, price: 15000,  place: 'water',
-    icon: '🧺', desc: 'Rọ tre thả cạnh bờ, ngập xuống nước — cá sống khỏe. Chứa 18kg. Quá tải: RỌ CÓ THỂ VỠ, xổng hết cá!' },
-  { id: 'thung', name: 'Thùng cá', cap: 30, price: 50000,  place: 'bank',
-    icon: '🛢️', desc: 'Thùng nhựa to để trên bờ. Chứa 30kg, không bao giờ hỏng — nhưng đầy là hết chỗ.' },
+  { id: 'ro',    name: 'Rọng cá',  cap: 18, price: 15000,  place: 'water',
+    icon: '🥅', desc: 'Rọng lưới thả cạnh bờ, ngập xuống nước — cá sống khỏe. Chứa 18kg. Quá tải: RỌNG CÓ THỂ VỠ, xổng hết cá!' },
+  { id: 'thung', name: 'Thùng câu', cap: 30, price: 50000,  place: 'bank',
+    icon: '🧰', desc: 'Thùng câu có nắp ngồi, để trên bờ. Chứa 30kg, không bao giờ hỏng — nhưng đầy là hết chỗ.' },
 ];
 // ===== Rủi ro đồ đựng cá — hàm thuần (không DOM), test được bằng node =====
 // load = tổng kg đang giữ / cap. Mọi công thức ghi rõ để dễ cân bằng.
@@ -126,7 +126,7 @@ function contRiskLevel(id, load) {
   if (id === 'xo') return load >= 1.3 ? 'jump-many' : 'risk';
   return 'full';
 }
-// Tỉ lệ VỠ RỌ khi cho thêm cá lúc quá tải. load≥1.5 → 1 (chắc chắn vỡ).
+// Tỉ lệ VỠ RỌNG khi cho thêm cá lúc quá tải. load≥1.5 → 1 (chắc chắn vỡ).
 // Công thức: 10% + 160% × (độ vượt tải). Vd tải 110% → 26%, 125% → 50%, 140% → 74%.
 function roBreakChance(load) {
   if (load >= 1.5) return 1;
