@@ -61,13 +61,37 @@ function defaultSave() {
            banUntil: '', spendDay: null, basket: [], weekEntries: {}, weekEval: '',
            wifeApproved: false, titles: [], lateCount: 0,
            // Bảng xếp hạng
-           totalEarned: 0, biggestFish: 0, playerName: '', lbSent: 0 };
+           totalEarned: 0, biggestFish: 0, playerName: '', lbSent: 0,
+           // Hệ thống đồ đựng cá (mode Trốn vợ): câu ở bờ KHÔNG bán ngay,
+           // chỉ "Cho vào đồ đựng" — về nhà mới Bán/Dâng/Nấu. (Tự do giữ nguyên.)
+           containers: ['xo'], activeContainer: 'xo', keptFish: [] };
 }
 let S;
 try { S = Object.assign(defaultSave(), JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); }
 catch (e) { S = defaultSave(); }
+// Tương thích save cũ: đồ đựng chưa có / đang chọn loại chưa sở hữu
+if (!Array.isArray(S.containers) || !S.containers.length) S.containers = ['xo'];
+if (!containerById(S.activeContainer) || !S.containers.includes(S.activeContainer))
+  S.activeContainer = S.containers[S.containers.length - 1];
+if (!Array.isArray(S.keptFish)) S.keptFish = [];
+// Di trú giỏ cá cũ (S.basket) sang đồ đựng
+if (Array.isArray(S.basket) && S.basket.length && !S.keptFish.length) {
+  S.keptFish = S.basket.map(f => ({ fishId: f.fishId, name: f.name, weight: f.weight, price: f.price }));
+}
+S.basket = [];
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 function rod() { return RODS.find(r => r.id === S.rod) || RODS[0]; }
+/* ---------- Hệ thống đồ đựng cá (mode Trốn vợ) ---------- */
+function contDef() { return containerById(S.activeContainer); }
+function keptCount() { return (S.keptFish || []).length; }
+function keptValue() { return (S.keptFish || []).reduce((a, f) => a + (f.price || 0), 0); }
+function contFull() { return keptCount() >= contDef().cap; }
+// Vị trí vẽ + vùng chạm của đồ đựng (khớp Art.drawContainer)
+function containerPos() {
+  const c = contDef();
+  if (c.place === 'water') return L.portrait ? { x: 455, y: 250, r: 46 } : { x: 830, y: 250, r: 46 };
+  return L.portrait ? { x: 400, y: 890, r: 40 } : { x: 690, y: 512, r: 40 };
+}
 // Cấp cần thủ: floor(tổng cá đã câu / 10) + 1, tối đa 15
 function level() { return Math.min(15, Math.floor((S.totalFish || 0) / 10) + 1); }
 function mapUnlocked(id) {
@@ -155,7 +179,7 @@ let lastClockMin = -1;        // phút game đã hiển thị trên HUD (tránh 
 /* ---------- DOM helper ---------- */
 const $ = id => document.getElementById(id);
 const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-dig', 'pop-result', 'scr-map', 'scr-quest',
-  'scr-call', 'scr-wifehome', 'scr-kitchen', 'scr-leaderboard', 'scr-name'];
+  'scr-call', 'scr-wifehome', 'scr-kitchen', 'scr-leaderboard', 'scr-name', 'scr-container'];
 function show(id) {
   screens.forEach(s => $(s).classList.toggle('hidden', s !== id));
   $('hud').classList.toggle('hidden', !(id === null && isFishing()));
@@ -203,6 +227,11 @@ function updateHUD() {
     sp.classList.toggle('hot', (S.suspicion || 0) >= 60);
   }
   $('hud-buff').classList.toggle('hidden', !buffActive());
+  // Đồ đựng cá (mode Trốn vợ, khi đang đi câu)
+  const hc = $('hud-container');
+  const showCont = S.mode === 'wife' && (trip || isFishing());
+  hc.classList.toggle('hidden', !showCont);
+  if (showCont) hc.textContent = contDef().icon + ' ' + keptCount() + '/' + contDef().cap;
   $('menu-money').textContent = fmt(S.money);
   $('menu-level').textContent = 'Cấp ' + level();
   // Dòng trạng thái vợ con trên menu
@@ -241,7 +270,8 @@ function startWifeTrip() {
     elapsed: 0, willCall: Math.random() < 0.6, called: false,
     callAt: rnd(120, 360), resumePhase: null,
   };
-  S.basket = [];
+  S.keptFish = []; // đầu chuyến: đồ đựng trống
+  if (!S.containers.includes(S.activeContainer)) S.activeContainer = S.containers[S.containers.length - 1];
   S.weekEntries[todayStr()] = true;
   save();
   const h = new Date().getHours();
@@ -410,6 +440,20 @@ function renderPrepare() {
   $('prep-nobait-hint').classList.toggle('hidden', hasBait);
   $('btn-dig').textContent = digLabel();
   $('btn-dig').disabled = digsLeft() <= 0;
+  // Đồ đựng cá (chỉ mode Trốn vợ): chọn trong số đã sở hữu
+  const wifeMode = S.mode === 'wife';
+  $('prep-cont-title').classList.toggle('hidden', !wifeMode);
+  const cl = $('container-list');
+  cl.classList.toggle('hidden', !wifeMode);
+  if (wifeMode) {
+    cl.innerHTML = S.containers.map(id => {
+      const c = containerById(id), using = S.activeContainer === id;
+      return '<div class="card' + (using ? ' selected' : '') + '" data-cont="' + id + '">' +
+        '<span class="cont-icon">' + c.icon + '</span>' +
+        '<div class="card-title">' + c.name + '</div>' +
+        '<div class="card-desc">' + c.desc + (using ? '<br><b>Đang mang theo</b>' : '') + '</div></div>';
+    }).join('');
+  }
 }
 function enterPrepare() { phase = 'PREPARE'; show('scr-prepare'); renderPrepare(); }
 
@@ -424,6 +468,18 @@ function renderShop() {
     '<div class="card"><div class="card-title">🪱 Giun đất <span class="count">x' + S.giun + '</span></div>' +
     '<div class="card-desc">Miễn phí — tự tay đào mới có! Còn ' + digsLeft() + '/' + DIG.perDay + ' lượt hôm nay.</div>' +
     '<button class="btn small" data-act="dig"' + (digsLeft() <= 0 ? ' disabled' : '') + '>' + digLabel() + '</button></div>';
+  // Đồ đựng cá (mode Trốn vợ) — xô ghẻ mặc định đã có
+  $('shop-containers').innerHTML = CONTAINERS.filter(c => c.price > 0).map(c => {
+    const owned = S.containers.includes(c.id);
+    const btn = owned
+      ? '<button class="btn small" disabled>Đã sở hữu ✓</button>'
+      : '<button class="btn small" data-act="buycontainer" data-id="' + c.id + '"' +
+        (S.money < c.price ? ' disabled' : '') + '>Mua ' + fmt(c.price) + '</button>';
+    return '<div class="card' + (owned ? ' owned' : '') + '">' +
+      '<span class="cont-icon">' + c.icon + '</span>' +
+      '<div class="card-title">' + c.name + '</div>' +
+      '<div class="card-desc">' + c.desc + '</div>' + btn + '</div>';
+  }).join('');
 }
 
 /* ---------- Mini-game đào giun ---------- */
@@ -714,14 +770,24 @@ function fightWin() {
   const rc = $('res-fish'), rx = rc.getContext('2d');
   rx.clearRect(0, 0, rc.width, rc.height);
   Art.drawFishIcon(rx, fish, 120, 65, 150);
-  // Đợt 2: mode Trốn vợ → 3 lựa chọn, mỗi lựa chọn 1 câu hài
+  // Mode Trốn vợ: 2 lựa chọn — Cho vào đồ đựng (về nhà mới bán/dâng/nấu) hoặc Phóng sinh.
+  // (Chế độ Câu tự do giữ nguyên: bán ngay ở bờ.)
   const wife = S.mode === 'wife';
   $('res-row-free').classList.toggle('hidden', wife);
   $('res-row-wife').classList.toggle('hidden', !wife);
+  if (wife) renderWifeResult();
   $('res-row-wife-done').classList.add('hidden');
   $('res-funny').classList.add('hidden');
   $('res-funny').textContent = '';
   show('pop-result');
+}
+// Cập nhật nút "Cho vào đồ đựng" theo sức chứa còn lại
+function renderWifeResult() {
+  const c = contDef(), n = keptCount(), full = n >= c.cap;
+  const btn = $('btn-wife-keep');
+  btn.textContent = c.icon + ' Cho vào ' + c.name + ' (' + n + '/' + c.cap + ')';
+  btn.disabled = full;
+  if (full) toast('🪣 Đầy ắp rồi, về nhà thôi!');
 }
 function showFunny(text) {
   const f = $('res-funny');
@@ -788,12 +854,18 @@ function renderWifeHome() {
   $('wh-titles').innerHTML = (S.titles && S.titles.length)
     ? S.titles.map(t => '<span class="title-badge">🏅 ' + t + '</span>').join('')
     : '<span class="subtitle">Chưa có danh hiệu — cố lên!</span>';
-  const b = S.basket || [];
-  $('wh-basket-n').textContent = b.length;
-  $('wh-basket').innerHTML = b.length
+  const b = S.keptFish || [];
+  const cap = contDef().cap;
+  $('wh-kept-n').textContent = b.length;
+  $('wh-kept-cap').textContent = cap;
+  $('wh-kept').innerHTML = b.length
     ? b.map(f => '<div class="card"><div class="card-title">🐟 ' + f.name + '</div>' +
       '<div class="card-desc">' + f.weight.toFixed(2) + ' kg — trị giá ' + fmt(f.price) + '</div></div>').join('')
-    : '<p class="subtitle">Giỏ trống — lần sau nhớ mang cá về nịnh vợ nhé!</p>';
+    : '<p class="subtitle">Đồ đựng trống — ra bờ câu thêm rồi mang về nhé!</p>';
+  const hasFish = b.length > 0;
+  $('btn-sell-kept').disabled = !hasFish;
+  $('btn-offer-fish').disabled = !hasFish;
+  $('btn-kitchen').disabled = !hasFish;
   $('wh-gifts').innerHTML = WIFE_GIFTS.map(g =>
     '<div class="card"><div class="card-title">' + g.icon + ' ' + g.name + '</div>' +
     '<div class="card-desc">' + g.desc + '</div>' +
@@ -805,22 +877,33 @@ function renderWifeHome() {
     (S.wifeApproved ? ' ✅ Đã được vợ duyệt!' : '') + '</span>';
 }
 function offerFish() {
-  const b = S.basket || [];
-  if (!b.length) { toast('Giỏ trống trơn, dâng gì bây giờ? 😅'); return; }
+  const b = S.keptFish || [];
+  if (!b.length) { toast('Đồ đựng trống trơn, dâng gì bây giờ? 😅'); return; }
   const n = b.length;
   const down = Math.min(30, n * 8);
   S.suspicion = Math.max(0, (S.suspicion || 0) - down);
   S.happiness = clamp((S.happiness || 0) + n * 10, 0, 100);
-  S.basket = [];
+  S.keptFish = [];
   save();
-  const lines = [
-    'Vợ nhìn giỏ cá: "Ừm... tạm tha!" 😍',
-    '"Cá tươi thế! Thôi, lần này bỏ qua!" — vợ cười rồi kìa 🥰',
-    n + ' con cá đổi lấy 1 nụ cười của vợ — quá hời! 😄',
-  ];
-  toast('🎁 ' + lines[Math.floor(Math.random() * lines.length)] + ' (-' + down + ' nghi ngờ)');
+  toast('🎁 ' + funny(FUNNY_GIFT) + ' (-' + down + ' nghi ngờ)');
   Sfx.caught();
   if ((S.happiness || 0) >= 80) addTitle('Chồng quốc dân');
+  renderWifeHome(); updateHUD();
+}
+// Bán hết cá trong đồ đựng (chỉ ở nhà mới được bán — luật mode Trốn vợ)
+function sellKept() {
+  const b = S.keptFish || [];
+  if (!b.length) { toast('Chưa có con cá nào để bán!'); return; }
+  const total = b.reduce((a, f) => a + (f.price || 0), 0);
+  S.money += total;
+  S.totalEarned = (S.totalEarned || 0) + total;
+  b.forEach(() => questEvent('sell'));
+  S.keptFish = [];
+  save();
+  Sfx.sell();
+  lbAfterSell(); // gửi điểm BXH ngầm
+  addSuspicion(5, 'tiền bán cá giấu ở đâu?');
+  toast('💰 ' + funny(FUNNY_SELL, { price: fmt(total) }));
   renderWifeHome(); updateHUD();
 }
 function buyWifeGift(id) {
@@ -833,8 +916,10 @@ function buyWifeGift(id) {
   if ((S.happiness || 0) >= 80) addTitle('Chồng quốc dân');
   renderWifeHome(); updateHUD();
 }
-/* Mini-game "Vào bếp" — bấm đúng 4 nguyên liệu trong 30s */
+/* Mini-game "Vào bếp" — bấm đúng 4 nguyên liệu trong 30s.
+   Cần ít nhất 1 con cá trong đồ đựng; thắng thì "nấu" 1 con (trừ khỏi keptFish). */
 function enterKitchen() {
+  if (!(S.keptFish || []).length) { toast('Cần ít nhất 1 con cá trong đồ đựng để nấu! 🐟'); Sfx.fail(); return; }
   phase = 'KITCHEN'; show('scr-kitchen');
   const items = KITCHEN_GOOD.concat(KITCHEN_BAD).sort(() => Math.random() - 0.5);
   const grid = $('kitchen-grid'); grid.innerHTML = '';
@@ -865,9 +950,10 @@ function enterKitchen() {
     if (over) return; over = true;
     clearInterval(tick);
     if (res === 'win') {
+      const cooked = (S.keptFish || []).shift(); // nấu 1 con cá trong đồ đựng
       S.suspicion = Math.max(0, (S.suspicion || 0) - 20);
       save();
-      toast('👨‍🍳 Nấu ăn thành công! Vợ ăn khen ngon (-20 nghi ngờ) 😋');
+      toast('👨‍🍳 Nấu ăn thành công! Món "' + (cooked ? cooked.name : 'cá') + ' kho tộ" — vợ ăn khen ngon (-20 nghi ngờ) 😋');
       Sfx.caught();
     } else if (res === 'fail') {
       toast('👨‍🍳 Cháy nồi rồi! Vợ: "Thôi để đấy..." 😅');
@@ -879,6 +965,23 @@ function enterKitchen() {
   $('btn-kitchen-end').onclick = () => { Sfx.init(); Sfx.click(); endKitchen('quit'); };
 }
 
+/* ---------- Đồ đựng cá: popup xem + chạm trong scene ---------- */
+// Popup xem cá đang giữ — chạm vào xô/rọ/thùng trong scene (mode Trốn vợ)
+function enterContainer() {
+  const c = contDef(), b = S.keptFish || [];
+  $('cont-title').textContent = c.icon + ' ' + c.name;
+  $('cont-sub').textContent = 'Đang giữ ' + b.length + '/' + c.cap + ' con' +
+    (c.place === 'water' ? ' — rọ ngập dưới nước, cá sống khỏe 🐟' : ' — để trên bờ');
+  $('cont-list').innerHTML = b.length
+    ? b.map(f => '<div class="kept-row"><span class="kept-ico">🐟</span>' +
+      '<span class="kept-who"><b>' + escHtml(f.name) + '</b>' +
+      '<small>' + f.weight.toFixed(2) + ' kg</small></span>' +
+      '<span class="kept-price">' + fmt(f.price) + '</span></div>').join('')
+    : '<p class="kept-empty">Chưa có con cá nào — quăng cần đi bạn ơi! 🎣';
+  $('cont-total').textContent = b.length ? 'Tổng giá trị ước tính: ' + fmt(keptValue()) : '';
+  show('scr-container');
+}
+
 /* ---------- Input ---------- */
 function canvasPos(e) {
   const r = cv.getBoundingClientRect();
@@ -886,6 +989,14 @@ function canvasPos(e) {
 }
 function onPress(e) {
   Sfx.init();
+  // Chạm vào đồ đựng cá trong scene (mode Trốn vợ, lúc rảnh tay: CAST/WAIT)
+  if (S.mode === 'wife' && (phase === 'CAST' || phase === 'WAIT')) {
+    const p = canvasPos(e);
+    const cp = containerPos();
+    const rr = cv.getBoundingClientRect();
+    const hitR = Math.max(cp.r, 48 / (rr.width / L.W)); // ≥48px vật lý
+    if (Math.hypot(p.x - cp.x, p.y - cp.y) < hitR) { enterContainer(); return; }
+  }
   if (phase === 'SPOT') {
     const p = canvasPos(e);
     // Vùng chạm co giãn theo tỉ lệ hiển thị: đảm bảo ≥48px vật lý trên mobile
@@ -985,6 +1096,8 @@ bindClick('btn-home', () => {
   else enterMenu();
 });
 bindClick('btn-offer-fish', offerFish);
+bindClick('btn-sell-kept', sellKept);
+bindClick('btn-cont-close', () => show(null));
 bindClick('btn-kitchen', enterKitchen);
 bindClick('btn-wh-end', enterMenu);
 bindClick('btn-dig', () => enterDig(false));
@@ -997,19 +1110,13 @@ bindClick('btn-sell', () => {
   $('pop-result').classList.add('hidden');
   afterAttempt();
 });
-// Đợt 2: 3 lựa chọn sau khi câu được cá trong mode Trốn vợ
-bindClick('btn-wife-sell', () => {
-  const price = lastPrice;
-  S.money += price; S.totalEarned = (S.totalEarned || 0) + price; save(); Sfx.sell();
-  questEvent('sell');
-  lbAfterSell(); // gửi điểm BXH ngầm
-  addSuspicion(5, 'tiền bán cá giấu ở đâu?');
-  showFunny(funny(FUNNY_SELL, { price: fmt(price) }));
-});
-bindClick('btn-wife-gift', () => {
-  S.basket.push({ fishId: fish.id, name: fish.name, weight: lastWeight, price: lastPrice });
+// Mode Trốn vợ: cho cá vào đồ đựng (KHÔNG bán ngay ở bờ — về nhà mới Bán/Dâng/Nấu)
+bindClick('btn-wife-keep', () => {
+  if (contFull()) { toast('🪣 Đầy ắp rồi, về nhà thôi!'); Sfx.fail(); return; }
+  S.keptFish.push({ fishId: fish.id, name: fish.name, weight: lastWeight, price: lastPrice });
   save();
-  showFunny(funny(FUNNY_GIFT));
+  updateHUD();
+  showFunny(funny(FUNNY_KEEP, { cont: contDef().name }));
 });
 bindClick('btn-wife-release', () => {
   S.merit = (S.merit || 0) + 1;
@@ -1065,6 +1172,16 @@ document.addEventListener('click', e => {
   if (q) { Sfx.init(); Sfx.click(); claimQuest(q.dataset.qclaim); return; }
   const gf = e.target.closest('[data-gift]');
   if (gf) { Sfx.init(); Sfx.click(); buyWifeGift(gf.dataset.gift); return; }
+  // Chọn đồ đựng cá mang theo (màn hình chuẩn bị, mode Trốn vợ)
+  const dc = e.target.closest('[data-cont]');
+  if (dc && S.containers.includes(dc.dataset.cont)) {
+    Sfx.init(); Sfx.click();
+    S.activeContainer = dc.dataset.cont; save();
+    toast(contDef().icon + ' Đã chọn mang theo ' + contDef().name + '.');
+    if (phase === 'PREPARE') renderPrepare();
+    updateHUD();
+    return;
+  }
   const b = e.target.closest('[data-act]');
   if (!b) return;
   Sfx.init(); Sfx.click();
@@ -1083,6 +1200,13 @@ document.addEventListener('click', e => {
     buyCam();
   } else if (act === 'dig') {
     enterDig(phase === 'SHOP');
+  } else if (act === 'buycontainer') {
+    const c = containerById(id);
+    if (c.price > 0 && !S.containers.includes(id) && S.money >= c.price) {
+      S.money -= c.price; S.containers.push(id); S.activeContainer = id; save();
+      trackSpend(c.price);
+      Sfx.sell(); toast('Đã mua ' + c.icon + ' ' + c.name + '!');
+    }
   }
   if (phase === 'PREPARE') renderPrepare();
   if (phase === 'SHOP') renderShop();
@@ -1275,6 +1399,12 @@ function render() {
   Art.drawScene(ctx, tG, {
     W: L.W, H: L.H,
     map: S.map,
+    // Đồ đựng cá (mode Trốn vợ): vẽ xô/thùng trên bờ, rọ ở mép nước
+    container: (function () {
+      if (S.mode !== 'wife' || !isFishing()) return null;
+      const cp = containerPos();
+      return { id: S.activeContainer, x: cp.x, y: cp.y };
+    })(),
     float: showFloat ? { x: fx, y: fy, show: true, dy: fdy, tilt } : { show: false },
     rodBend, splashes, biteFlash,
     castHint: phase === 'CAST',
@@ -1436,6 +1566,11 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     forceStrikeWin() { if (strike) strike.pos = strike.zc; },
     forceFightWin() { if (fight) fight.prog = 1; },
     selectSpot(i) { spot = RIVER_SPOTS[i]; },
+    // Đồ đựng cá (test)
+    cont() { return { containers: S.containers.slice(), active: S.activeContainer, kept: S.keptFish.slice(), cap: contDef().cap }; },
+    setKept(arr) { S.keptFish = arr; save(); },
+    sellKeptNow() { sellKept(); },
+    openContainer() { enterContainer(); },
   };
 }
 
