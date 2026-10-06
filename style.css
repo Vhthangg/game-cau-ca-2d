@@ -53,11 +53,13 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0; padding: 0; height: 100%;
-  background: var(--night);
+  /* Nền đồng bộ với game: trời quê → đồng xanh → đêm ao */
+  background: linear-gradient(180deg, #8ecae6 0%, #a8d5a2 45%, #0d2b1f 100%);
   font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--ink);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
+  touch-action: manipulation; /* chống double-tap zoom, giữ cuộn panel */
 }
 #wrap {
   position: relative;
@@ -65,9 +67,12 @@ html, body {
   aspect-ratio: 16 / 9;
   box-shadow: 0 0 40px rgba(0, 0, 0, .6);
   border-radius: var(--r-sm); overflow: hidden;
-  touch-action: none; user-select: none; -webkit-user-select: none;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
 }
-#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#game {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  touch-action: none; /* canvas gameplay: chặn cuộn/zoom khi chạm */
+}
 #ui { position: absolute; inset: 0; pointer-events: none; }
 
 .hidden { display: none !important; }
@@ -108,7 +113,15 @@ html, body {
   box-shadow: var(--shadow-panel);
 }
 @media (max-width: 640px) and (orientation: portrait) {
-  #rotate-hint { display: block; }
+  #rotate-hint {
+    display: block;
+    /* Tự mờ dần sau 6s để không che HUD lâu */
+    animation: hint-fade 6.5s ease forwards;
+  }
+  @keyframes hint-fade {
+    0%, 80% { opacity: 1; }
+    100% { opacity: 0; visibility: hidden; }
+  }
 }
 
 /* ---- Màn hình phủ ---- */
@@ -246,6 +259,7 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .dig-cell.active { animation: none; }
+  #rotate-hint { animation: none; }
   * { transition-duration: 0.01ms !important; }
 }
 
@@ -311,3 +325,52 @@ html, body {
 /* HUD mode vợ */
 #hud-susp.hot { background: rgba(198, 40, 40, .9); border-color: #ff8a80; }
 #hud-buff { background: rgba(27, 94, 32, .9); }
+
+/* ============ Mobile dọc: HUD gọn + canvas full-width ============ */
+@media (max-width: 640px) and (orientation: portrait) {
+  #wrap {
+    width: 100vw;
+    height: 100vh; height: 100dvh;
+    aspect-ratio: auto;
+    border-radius: 0; box-shadow: none;
+    display: flex; flex-direction: column;
+    justify-content: flex-start;
+  }
+  /* HUD thành 1 hàng cuộn ngang, gọn dưới tai thỏ */
+  #hud {
+    position: relative; top: auto; left: auto; right: auto;
+    flex: 0 0 auto; width: 100%;
+    display: flex; flex-wrap: nowrap; align-items: center;
+    gap: 6px; overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none; -ms-overflow-style: none;
+    padding: calc(8px + env(safe-area-inset-top)) 60px 8px calc(8px + env(safe-area-inset-left));
+    margin: 0;
+    background: linear-gradient(180deg, rgba(13, 43, 31, .92), rgba(13, 43, 31, .55));
+  }
+  #hud::-webkit-scrollbar { display: none; }
+  #hud .pill {
+    flex: 0 0 auto; scroll-snap-align: start;
+    font-size: 13px; padding: 7px 11px;
+  }
+  #hud #btn-home { margin-left: 0; flex: 0 0 auto; width: 44px; height: 44px; }
+  /* Canvas full-width 16:9 ngay dưới HUD */
+  #game {
+    position: relative; inset: auto;
+    width: 100%; height: auto; aspect-ratio: 16 / 9;
+    flex: 0 0 auto;
+  }
+  /* Nút loa: góc phải dưới HUD, không đè pill */
+  #btn-mute {
+    top: calc(10px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right));
+    width: 44px; height: 44px; z-index: 20;
+  }
+  /* Màn hình phủ full viewport */
+  .screen { padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .panel { max-height: 100%; }
+  .panel h1 { font-size: 24px; }
+  /* Toast tránh vùng cử chỉ đáy */
+  #toast { bottom: calc(24px + env(safe-area-inset-bottom)); font-size: 14px; }
+  /* Popup kết quả: nút xếp dọc full-width cho ngón tay */
+  #pop-result .panel { max-width: 100%; }
+}

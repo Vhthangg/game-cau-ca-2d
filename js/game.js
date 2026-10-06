@@ -762,7 +762,10 @@ function onPress(e) {
   Sfx.init();
   if (phase === 'SPOT') {
     const p = canvasPos(e);
-    const s = RIVER_SPOTS.find(s => Math.hypot(p.x - s.x, p.y - s.y) < 60);
+    // Vùng chạm co giãn theo tỉ lệ hiển thị: đảm bảo ≥48px vật lý trên mobile
+    const rr = cv.getBoundingClientRect();
+    const hitR = Math.max(60, 48 / (rr.width / 960));
+    const s = RIVER_SPOTS.find(s => Math.hypot(p.x - s.x, p.y - s.y) < hitR);
     if (s) {
       spot = s; Sfx.click();
       toast('Đã chọn: ' + s.name + ' — ' + s.desc);

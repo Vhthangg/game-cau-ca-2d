@@ -2,29 +2,29 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Câu Cá Ao Làng</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="wrap">
+  <!-- HUD: in-flow trên mobile dọc, overlay trên desktop -->
+  <div id="hud" class="hidden">
+    <span id="hud-money" class="pill">💰 0đ</span>
+    <span id="hud-level" class="pill">⭐ Cấp 1</span>
+    <span id="hud-map" class="pill">🏡 Ao làng</span>
+    <span id="hud-weather" class="pill hidden">☀️</span>
+    <span id="hud-giun" class="pill">🪱 0</span>
+    <span id="hud-cam" class="pill">🟤 0</span>
+    <span id="hud-rod" class="pill">🎣 Cần tre</span>
+    <span id="hud-clock" class="pill hidden">🕐 15:00</span>
+    <span id="hud-susp" class="pill hidden">😒 0</span>
+    <span id="hud-buff" class="pill hidden">🍀</span>
+    <button id="btn-home" class="icon-btn" title="Về menu chính">🏠</button>
+  </div>
   <canvas id="game" width="960" height="540"></canvas>
 
   <div id="ui">
-    <!-- Thanh trạng thái khi đang câu -->
-    <div id="hud" class="hidden">
-      <span id="hud-money" class="pill">💰 0đ</span>
-      <span id="hud-level" class="pill">⭐ Cấp 1</span>
-      <span id="hud-map" class="pill">🏡 Ao làng</span>
-      <span id="hud-weather" class="pill hidden">☀️</span>
-      <span id="hud-giun" class="pill">🪱 0</span>
-      <span id="hud-cam" class="pill">🟤 0</span>
-      <span id="hud-rod" class="pill">🎣 Cần tre</span>
-      <span id="hud-clock" class="pill hidden">🕐 15:00</span>
-      <span id="hud-susp" class="pill hidden">😒 0</span>
-      <span id="hud-buff" class="pill hidden">🍀</span>
-      <button id="btn-home" class="icon-btn" title="Về menu chính">🏠</button>
-    </div>
     <button id="btn-mute" class="icon-btn" title="Bật/tắt âm thanh">🔊</button>
 
     <!-- Menu chính -->
