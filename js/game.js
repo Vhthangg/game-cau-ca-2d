@@ -5,6 +5,46 @@
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
 
+/* ---------- Dual-layout: landscape 960x540 / portrait 540x960 ---------- */
+const L = { W: 960, H: 540, portrait: false };
+// Tọa độ điểm câu sông quê theo layout (portrait: ánh xạ tuyến tính giữ nguyên vị trí tương đối)
+RIVER_SPOTS.forEach(s => {
+  s.px = Math.round(s.x / 960 * 540);
+  s.py = Math.round(195 + (s.y - 185) / 270 * 535);
+});
+function spotPos(s) { return L.portrait ? { x: s.px, y: s.py } : { x: s.x, y: s.y }; }
+function castMinX() { return L.portrait ? 30 : 60; }
+function castRange() { return L.portrait ? 480 : 840; }
+function fitPortraitCanvas() {
+  if (!L.portrait) { cv.style.width = ''; cv.style.height = ''; return; }
+  const wrap = $('wrap'), hud = $('hud'), bar = $('action-bar');
+  const barH = bar.classList.contains('hidden') ? 0 : bar.offsetHeight;
+  const availW = wrap.clientWidth;
+  const availH = Math.max(200, wrap.clientHeight - hud.offsetHeight - barH);
+  const scale = Math.min(availW / L.W, availH / L.H);
+  cv.style.width = Math.floor(L.W * scale) + 'px';
+  cv.style.height = Math.floor(L.H * scale) + 'px';
+}
+function updateLayout() {
+  const p = window.innerHeight >= window.innerWidth;
+  const oW = L.W, oH = L.H;
+  L.portrait = p;
+  L.W = p ? 540 : 960;
+  L.H = p ? 960 : 540;
+  if (oW !== L.W || oH !== L.H) {
+    cv.width = L.W; cv.height = L.H;
+    // Xoay giữa chừng: giữ nguyên vị trí tương đối của phao & hạt nước
+    const sx = L.W / oW, sy = L.H / oH;
+    fx *= sx; fy *= sy;
+    splashes.forEach(s => { s.x *= sx; s.y *= sy; });
+  }
+  document.body.classList.toggle('is-portrait', p);
+  updateActionBar();
+  fitPortraitCanvas();
+}
+window.addEventListener('resize', updateLayout);
+window.addEventListener('orientationchange', updateLayout);
+
 /* ---------- Lưu trữ ---------- */
 const SAVE_KEY = 'cauCaAoLang_v1';
 function defaultSave() {
@@ -441,13 +481,14 @@ function enterCast(msg) {
   hint = msg || null;
 }
 function waterBounds(x, y) {
+  if (L.portrait) return x >= 30 && x <= 510 && y >= 205 && y <= 720;
   if (S.map === 'song') return x >= 60 && x <= 900 && y >= 230 && y <= 430;
   return x >= 60 && x <= 900 && y >= 215 && y <= 445;
 }
 
 function doCast(x, y) {
   if (!waterBounds(x, y)) { toast('Chạm vào mặt nước để quăng cần!'); return; }
-  const maxX = 60 + rod().cast * 840;
+  const maxX = castMinX() + rod().cast * castRange();
   if (x > maxX) { x = maxX; toast('Cần của bạn chỉ quăng tới đây!'); }
   fx = x; fy = y; hint = null;
   Sfx.splash();
@@ -474,7 +515,7 @@ function doCast(x, y) {
 
 function pickFish() {
   const pool = FISH.filter(f => f.map === S.map);
-  const distFrac = (fx - 60) / 840; // 0 gần .. 1 xa
+  const distFrac = (fx - castMinX()) / castRange(); // 0 gần .. 1 xa
   let total = 0;
   const ws = pool.map(f => {
     let w = f.w * ((distFrac > 0.65 && f.big) ? 2.5 : 1);
@@ -774,7 +815,7 @@ function enterKitchen() {
 /* ---------- Input ---------- */
 function canvasPos(e) {
   const r = cv.getBoundingClientRect();
-  return { x: (e.clientX - r.left) / r.width * 960, y: (e.clientY - r.top) / r.height * 540 };
+  return { x: (e.clientX - r.left) / r.width * L.W, y: (e.clientY - r.top) / r.height * L.H };
 }
 function onPress(e) {
   Sfx.init();
@@ -782,8 +823,8 @@ function onPress(e) {
     const p = canvasPos(e);
     // Vùng chạm co giãn theo tỉ lệ hiển thị: đảm bảo ≥48px vật lý trên mobile
     const rr = cv.getBoundingClientRect();
-    const hitR = Math.max(60, 48 / (rr.width / 960));
-    const s = RIVER_SPOTS.find(s => Math.hypot(p.x - s.x, p.y - s.y) < hitR);
+    const hitR = Math.max(60, 48 / (rr.width / L.W));
+    const s = RIVER_SPOTS.find(s => { const sp = spotPos(s); return Math.hypot(p.x - sp.x, p.y - sp.y) < hitR; });
     if (s) {
       spot = s; Sfx.click();
       toast('Đã chọn: ' + s.name + ' — ' + s.desc);
@@ -801,6 +842,47 @@ cv.addEventListener('pointerdown', onPress);
 window.addEventListener('pointerup', onRelease);
 window.addEventListener('pointercancel', onRelease);
 cv.addEventListener('contextmenu', e => e.preventDefault());
+
+/* ---------- Cụm nút thao tác portrait (dưới canvas) ---------- */
+// Portrait: nút bấm to cho ngón tay cái, mirror thao tác chạm canvas theo phase
+function actionCfg() {
+  switch (phase) {
+    case 'CAST':
+      return { label: '🎣 Quăng nhanh', fn: () => doCast(castMinX() + castRange() * 0.55, L.portrait ? 460 : 330) };
+    case 'WAIT':
+      return { label: '🔄 Thu cần', fn: () => enterCast('Chạm vào mặt nước để quăng lại!') };
+    case 'BITE':
+      return { label: '⚡ GIẬT NGAY!', fn: () => startStrike() };
+    case 'STRIKE':
+      return { label: '🎯 NHẤN ĐÚNG NHỊP!', fn: () => { strikeJudge(); } };
+    case 'FIGHT':
+      return { label: '💪 GIỮ ĐỂ BO CÁ', hold: true };
+    default:
+      return null;
+  }
+}
+let abKey = '';
+function updateActionBar() {
+  const bar = $('action-bar'), btn = $('btn-action');
+  if (!bar || !btn) return;
+  const anyScreen = !!document.querySelector('#ui .screen:not(.hidden)');
+  const cfg = (L.portrait && isFishing() && !anyScreen) ? actionCfg() : null;
+  const key = (cfg ? '1' : '0') + '|' + phase;
+  if (key === abKey) return;
+  abKey = key;
+  bar.classList.toggle('hidden', !cfg);
+  if (!cfg) { fitPortraitCanvas(); return; }
+  btn.textContent = cfg.label;
+  if (cfg.hold) {
+    btn.onclick = null;
+    btn.onpointerdown = e => { e.preventDefault(); Sfx.init(); holding = true; };
+  } else {
+    btn.onpointerdown = null;
+    btn.onclick = () => { Sfx.init(); Sfx.click(); cfg.fn(); };
+  }
+  btn.oncontextmenu = e => e.preventDefault();
+  fitPortraitCanvas();
+}
 window.addEventListener('keydown', e => {
   if (e.code === 'Space' || e.code === 'Enter') {
     if (['CAST', 'BITE', 'STRIKE', 'FIGHT'].includes(phase)) { e.preventDefault(); if (!e.repeat) onPress(e); }
@@ -1112,15 +1194,16 @@ function render() {
   if (phase === 'WAIT' && !phaseHint) phaseHint = 'Đang chờ cá cắn... 👀 nhìn phao!';
   if (phase === 'BITE') phaseHint = '⚡ Cá cắn! Nhấn ngay!';
   Art.drawScene(ctx, tG, {
+    W: L.W, H: L.H,
     map: S.map,
     float: showFloat ? { x: fx, y: fy, show: true, dy: fdy, tilt } : { show: false },
     rodBend, splashes, biteFlash,
     castHint: phase === 'CAST',
-    maxCastX: 60 + rod().cast * 840,
+    maxCastX: castMinX() + rod().cast * castRange(),
     hint: (phase === 'CAST' || phase === 'WAIT' || phase === 'BITE') ? phaseHint : null,
     strike: phase === 'STRIKE' ? strike : null,
     fight: phase === 'FIGHT' ? { tension: fight.tension, zc: fight.zc, zw: fight.zw, prog: Math.min(fight.prog, 1) } : null,
-    spots: phase === 'SPOT' ? RIVER_SPOTS : null,
+    spots: phase === 'SPOT' ? RIVER_SPOTS.map(s => { const p = spotPos(s); return { x: p.x, y: p.y, name: s.name, flow: s.flow }; }) : null,
     spotHint: phase === 'SPOT' ? hint : null,
   });
 }
@@ -1130,6 +1213,7 @@ function loop(ts) {
   lastTs = ts; tG += dt;
   update(dt);
   render();
+  updateActionBar(); // đồng bộ cụm nút portrait theo phase (có cache, rẻ)
   // Đợt 2: cập nhật đồng hồ game trên HUD theo từng phút
   if (S.mode === 'wife' && trip && ! $('hud-clock').classList.contains('hidden')) {
     const cm = Math.floor(trip.gameMin);
@@ -1277,6 +1361,7 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
 }
 
 enterMenu();
+updateLayout(); // chốt logical size canvas + body.is-portrait trước frame đầu
 requestAnimationFrame(loop);
 
 // Hook cho automated test (chỉ đọc state, không ảnh hưởng gameplay)
