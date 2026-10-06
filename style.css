@@ -102,26 +102,11 @@ html, body {
 #btn-mute { position: absolute; top: var(--sp-2); right: var(--sp-2); z-index: 30; }
 #hud #btn-home { margin-left: auto; }
 
-/* ---- Gợi ý xoay màn hình (mobile dọc) ---- */
-#rotate-hint {
-  display: none;
-  position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
-  z-index: 50;
-  background: var(--hud-bg); color: var(--hud-ink);
-  padding: var(--sp-2) var(--sp-4); border-radius: var(--r-pill); font-size: 14px;
-  border: 1px solid rgba(255, 233, 184, .4); pointer-events: none; white-space: nowrap;
-  box-shadow: var(--shadow-panel);
-}
-@media (max-width: 640px) and (orientation: portrait) {
-  #rotate-hint {
-    display: block;
-    /* Tự mờ dần sau 6s để không che HUD lâu */
-    animation: hint-fade 6.5s ease forwards;
-  }
-  @keyframes hint-fade {
-    0%, 80% { opacity: 1; }
-    100% { opacity: 0; visibility: hidden; }
-  }
+/* ---- Cụm nút thao tác portrait (JS bật/tắt theo phase) ---- */
+#action-bar { display: none; }
+#btn-action {
+  margin: 0; touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* ---- Màn hình phủ ---- */
@@ -259,7 +244,6 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
   .dig-cell.active { animation: none; }
-  #rotate-hint { animation: none; }
   * { transition-duration: 0.01ms !important; }
 }
 
@@ -326,54 +310,68 @@ html, body {
 #hud-susp.hot { background: rgba(198, 40, 40, .9); border-color: #ff8a80; }
 #hud-buff { background: rgba(27, 94, 32, .9); }
 
-/* ============ Mobile dọc: HUD gọn + canvas full-width ============ */
-@media (max-width: 640px) and (orientation: portrait) {
-  #wrap {
-    width: 100vw;
-    height: 100vh; height: 100dvh;
-    aspect-ratio: auto;
-    border-radius: 0; box-shadow: none;
-    display: flex; flex-direction: column;
-    justify-content: flex-start;
-  }
-  /* HUD thành 1 hàng cuộn ngang, gọn dưới tai thỏ */
-  #hud {
-    position: relative; top: auto; left: auto; right: auto;
-    flex: 0 0 auto; width: 100%;
-    display: flex; flex-wrap: nowrap; align-items: center;
-    gap: 6px; overflow-x: auto; overflow-y: hidden;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none; -ms-overflow-style: none;
-    padding: calc(8px + env(safe-area-inset-top)) 60px 8px calc(8px + env(safe-area-inset-left));
-    margin: 0;
-    background: linear-gradient(180deg, rgba(13, 43, 31, .92), rgba(13, 43, 31, .55));
-  }
-  #hud::-webkit-scrollbar { display: none; }
-  #hud .pill {
-    flex: 0 0 auto; scroll-snap-align: start;
-    font-size: 13px; padding: 7px 11px;
-  }
-  #hud #btn-home { margin-left: 0; flex: 0 0 auto; width: 44px; height: 44px; }
-  /* Canvas full-width 16:9 ngay dưới HUD */
-  #game {
-    position: relative; inset: auto;
-    width: 100%; height: auto; aspect-ratio: 16 / 9;
-    flex: 0 0 auto;
-  }
-  /* Nút loa: góc phải dưới HUD, không đè pill */
-  #btn-mute {
-    top: calc(10px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right));
-    width: 44px; height: 44px; z-index: 20;
-  }
-  /* Màn hình phủ full viewport */
-  .screen { padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-  .panel { max-height: 100%; }
-  .panel h1 { font-size: 24px; }
-  /* Toast tránh vùng cử chỉ đáy */
-  #toast { bottom: calc(24px + env(safe-area-inset-bottom)); font-size: 14px; }
-  /* Popup kết quả: nút xếp dọc full-width cho ngón tay */
-  #pop-result .panel { max-width: 100%; }
+/* ============ Portrait: layout dọc native (body.is-portrait do JS chốt) ============ */
+body.is-portrait #wrap {
+  width: 100vw;
+  height: 100vh; height: 100dvh;
+  aspect-ratio: auto;
+  border-radius: 0; box-shadow: none;
+  display: flex; flex-direction: column;
+  justify-content: flex-start;
 }
+/* HUD thành 1 hàng cuộn ngang, gọn dưới tai thỏ */
+body.is-portrait #hud {
+  position: relative; top: auto; left: auto; right: auto;
+  flex: 0 0 auto; width: 100%;
+  display: flex; flex-wrap: nowrap; align-items: center;
+  gap: 6px; overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none; -ms-overflow-style: none;
+  padding: calc(8px + env(safe-area-inset-top)) calc(112px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
+  margin: 0;
+  background: linear-gradient(180deg, rgba(13, 43, 31, .92), rgba(13, 43, 31, .55));
+}
+body.is-portrait #hud::-webkit-scrollbar { display: none; }
+body.is-portrait #hud .pill {
+  flex: 0 0 auto; scroll-snap-align: start;
+  font-size: 13px; padding: 7px 11px;
+}
+body.is-portrait #hud #btn-home {
+  /* Ghim nút home luôn hiện ở góc phải (không trôi theo dòng cuộn) */
+  position: absolute;
+  right: calc(60px + env(safe-area-inset-right));
+  top: 50%; transform: translateY(-50%);
+  margin-left: 0; flex: 0 0 auto; width: 44px; height: 44px;
+  box-shadow: var(--shadow-panel);
+}
+/* Canvas dọc 9:16 — JS chốt kích thước px chính xác, căn giữa phần trống còn lại */
+body.is-portrait #game {
+  position: relative; inset: auto;
+  flex: 0 0 auto; align-self: center;
+  margin-top: auto; margin-bottom: auto;
+}
+/* Cụm nút thao tác dưới cùng, theo safe-area */
+body.is-portrait #action-bar:not(.hidden) {
+  display: flex; justify-content: center;
+  flex: 0 0 auto; width: 100%;
+  padding: 10px calc(16px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  background: linear-gradient(0deg, rgba(13, 43, 31, .85), rgba(13, 43, 31, 0));
+}
+body.is-portrait #btn-action {
+  width: 100%; max-width: 420px; min-height: 56px; font-size: 19px;
+}
+/* Nút loa: góc phải dưới HUD, không đè pill */
+body.is-portrait #btn-mute {
+  top: calc(10px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right));
+  width: 44px; height: 44px; z-index: 20;
+}
+/* Màn hình phủ full viewport */
+body.is-portrait .screen { padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+body.is-portrait .panel { max-height: 100%; }
+/* Toast nhích lên trên cụm nút thao tác */
+body.is-portrait #toast { bottom: calc(104px + env(safe-area-inset-bottom)); font-size: 14px; }
+/* Popup kết quả: full-width cho ngón tay */
+body.is-portrait #pop-result .panel { max-width: 100%; }
 
 /* ============ Bảng xếp hạng ============ */
 .lb-status { color: var(--muted); font-size: 15px; margin: 10px 0; line-height: 1.6; }
