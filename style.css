@@ -429,3 +429,14 @@ body.is-portrait #pop-result .panel { max-width: 100%; }
 .kept-row .kept-price { font-weight: bold; color: var(--gold); white-space: nowrap; }
 .kept-empty { color: var(--muted); font-style: italic; padding: 10px; }
 #cont-sub { margin: 2px 0 6px; }
+
+/* Đồ đựng cá: thanh tải trọng + cảnh báo quá tải */
+.fillbar { height: 12px; border-radius: 6px; background: rgba(0,0,0,.18);
+  overflow: hidden; margin: 6px 0; border: 1px solid rgba(0,0,0,.25); }
+.fillbar .fill { height: 100%; width: 0%; border-radius: 6px;
+  background: linear-gradient(90deg, #66bb6a, #9ccc65); transition: width .3s; }
+.fillbar .fill.over { background: linear-gradient(90deg, #e53935, #ff7043); }
+.btn.danger { background: var(--danger); color: #fff; border-color: #ff8a80;
+  animation: pulse-danger 1s infinite; }
+@keyframes pulse-danger { 50% { filter: brightness(1.25); } }
+#hud-container.hot { background: rgba(198, 40, 40, .9); border-color: #ff8a80; }
