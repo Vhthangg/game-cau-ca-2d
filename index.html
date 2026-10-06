@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Câu Cá Ao Làng</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="540"></canvas>
+
+  <div id="ui">
+    <!-- Thanh trạng thái khi đang câu -->
+    <div id="hud" class="hidden">
+      <span id="hud-money" class="pill">💰 0đ</span>
+      <span id="hud-giun" class="pill">🪱 0</span>
+      <span id="hud-cam" class="pill">🟤 0</span>
+      <span id="hud-rod" class="pill">🎣 Cần tre</span>
+      <button id="btn-home" class="icon-btn" title="Về menu chính">🏠</button>
+    </div>
+    <button id="btn-mute" class="icon-btn" title="Bật/tắt âm thanh">🔊</button>
+
+    <!-- Menu chính -->
+    <div id="scr-menu" class="screen">
+      <div class="panel title-panel">
+        <h1>🎣 CÂU CÁ AO LÀNG</h1>
+        <p class="subtitle">Game câu cá 2D Việt Nam — học câu thật qua từng thao tác</p>
+        <p id="menu-money" class="money-line">💰 0đ</p>
+        <button id="btn-to-prepare" class="btn big primary">Ra ao câu</button>
+        <button id="btn-to-shop" class="btn big">Cửa hàng</button>
+        <button id="btn-to-help" class="btn big ghost">Hướng dẫn</button>
+      </div>
+    </div>
+
+    <!-- Chuẩn bị đồ câu -->
+    <div id="scr-prepare" class="screen hidden">
+      <div class="panel wide">
+        <h2>🎒 Chuẩn bị đồ câu <span id="prep-money" class="money-line">💰 0đ</span></h2>
+        <h3>Chọn cần</h3>
+        <div id="rod-list" class="cards"></div>
+        <h3>Chọn mồi <small>(mồi dùng để câu)</small></h3>
+        <div class="cards">
+          <div class="card" id="card-giun">
+            <div class="card-title">🪱 Giun đất <span id="bait-giun-count" class="count">x0</span></div>
+            <div class="card-desc">Miễn phí — phải tự đào bằng tay!</div>
+            <button id="btn-dig" class="btn small">⛏️ Đào giun</button>
+          </div>
+          <div class="card" id="card-cam">
+            <div class="card-title">🟤 Cám câu <span id="bait-cam-count" class="count">x0</span></div>
+            <div class="card-desc">100đ / gói 10 viên — cá cắn nhanh hơn</div>
+            <button id="btn-buy-cam-prep" class="btn small">Mua 100đ</button>
+          </div>
+        </div>
+        <p id="prep-nobait-hint" class="warn hidden">⚠️ Hết mồi! Hãy đào giun hoặc mua cám rồi quay lại.</p>
+        <div class="row">
+          <button id="btn-prep-back" class="btn ghost">← Quay lại</button>
+          <button id="btn-go-fish" class="btn big">Ra ao câu →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mini-game đào giun -->
+    <div id="scr-dig" class="screen hidden">
+      <div class="panel">
+        <h2>⛏️ Đào giun đất</h2>
+        <p>Chạm vào giun trồi lên! Còn <b id="dig-time">20</b>s — đã đào: <b id="dig-count">0</b> con</p>
+        <div id="dig-grid"></div>
+        <button id="btn-dig-end" class="btn">Xong</button>
+      </div>
+    </div>
+
+    <!-- Cửa hàng -->
+    <div id="scr-shop" class="screen hidden">
+      <div class="panel wide">
+        <h2>🏪 Cửa hàng <span id="shop-money" class="money-line">💰 0đ</span></h2>
+        <h3>Cần câu</h3>
+        <div id="shop-rods" class="cards"></div>
+        <h3>Mồi câu</h3>
+        <div id="shop-baits" class="cards"></div>
+        <div class="row">
+          <button id="btn-shop-back" class="btn ghost">← Quay lại</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hướng dẫn -->
+    <div id="scr-help" class="screen hidden">
+      <div class="panel wide help">
+        <h2>📖 Hướng dẫn chơi</h2>
+        <ol>
+          <li><b>Chuẩn bị:</b> chọn cần và mồi. Giun đất miễn phí nhưng phải đào tay, cám câu tốn tiền nhưng cá cắn nhanh hơn.</li>
+          <li><b>Quăng cần:</b> chạm vào mặt nước. Cần càng xịn quăng càng xa — chỗ xa thường có cá to.</li>
+          <li><b>Chờ cắn:</b> nhìn phao. Mỗi loài cá có kiểu cắn riêng: rô phi nhấp 2 cái rồi kéo chìm, cá trê rung mạnh liên tục...</li>
+          <li><b>Bắt nhịp:</b> khi cá cắn, nhấn đúng lúc kim chạy vào <span class="green">vùng xanh</span> (1,5 giây). Sớm/trễ là hụt, mất mồi.</li>
+          <li><b>Bo cá:</b> <b>giữ</b> chuột/phím để kéo (tăng lực), <b>thả</b> để nhả. Giữ kim trong vùng xanh cho đầy thanh tiến trình. Căng quá đứt dây, lỏng quá tuột cá!</li>
+          <li><b>Bán cá</b> lấy tiền mua cần xịn hơn. Cá to, cần khỏe — cứ thế mà lên đời!</li>
+        </ol>
+        <button id="btn-help-back" class="btn">Đã hiểu!</button>
+      </div>
+    </div>
+
+    <!-- Kết quả câu được cá -->
+    <div id="pop-result" class="screen hidden">
+      <div class="panel">
+        <h2 id="res-title">🐟 Dính cá!</h2>
+        <canvas id="res-fish" width="240" height="130"></canvas>
+        <p id="res-name" class="res-name"></p>
+        <p id="res-weight"></p>
+        <p id="res-price" class="money-line"></p>
+        <div class="row">
+          <button id="btn-release" class="btn ghost">Thả cá</button>
+          <button id="btn-sell" class="btn big">💰 Bán cá</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="hidden"></div>
+    <div id="rotate-hint">📱 Xoay ngang màn hình để chơi rõ hơn</div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/art.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
