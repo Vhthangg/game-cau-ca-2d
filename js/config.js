@@ -189,6 +189,15 @@ const FUNNY_GIFT = [
   'Giỏ cá đầy là bằng chứng yêu thương, không phải bằng chứng trốn vợ 😇',
   'Vợ ăn ngon → chồng được đi câu tiếp. Triết lý đơn giản mà sâu sắc 🧠',
 ];
+// Câu hài khi dùng tiền nịnh vợ lúc bị cấm câu
+const FUNNY_BRIBE = [
+  'Vợ cầm túi xách: "Tạm tha, lần sau còn nữa là biết tay!" 😏',
+  'Trà sữa tới tay, vợ hết giận một nửa — nửa còn lại để dành 😌',
+  '"Hoa đẹp như em... à nhầm, em đẹp như hoa!" — vợ cười rồi kìa 🌸',
+  'Son mới thoa, vợ soi gương: "Cũng biết điều đấy!" 💄',
+  'Túi xách xịn thế này thì... cấm câu còn 0 ngày nhé chồng 😎',
+  'Vợ lườm: "Tiền ở đâu ra?" — "Tiền... tiết kiệm ăn sáng đó em!" 😅',
+];
 // Câu hài khi phóng sinh
 const FUNNY_RELEASE = [
   'Thả em về với sông... kiếp sau đừng cắn câu anh nữa nhé 🙏',
@@ -227,6 +236,14 @@ const WIFE_GIFTS = [
   { id: 'hoa',     icon: '💐', name: 'Bó hoa',     price: 500,  happy: 15, desc: 'Hoa đẹp như vợ! Hạnh phúc +15 🌸' },
   { id: 'son',     icon: '💄', name: 'Son môi',    price: 800,  happy: 20, desc: 'Vợ thoa son đi chơi với bạn! Hạnh phúc +20 💃' },
   { id: 'tui',     icon: '👜', name: 'Túi xách',   price: 2000, happy: 30, desc: 'Vợ ôm túi cười cả ngày! Hạnh phúc +30 🥰' },
+];
+
+// Quà chuộc lỗi khi bị cấm câu (trừ nghi ngờ — nghi ngờ < 80 là được gỡ cấm ngay)
+const BRIBE_GIFTS = [
+  { id: 'tra-sua', icon: '🧋', name: 'Trà sữa',   price: 300,  down: 3,  happy: 2, desc: 'Vợ bớt giận chút xíu! Nghi ngờ -3 😌' },
+  { id: 'hoa',     icon: '💐', name: 'Bó hoa',     price: 500,  down: 6,  happy: 3, desc: 'Vợ mỉm cười! Nghi ngờ -6 🌸' },
+  { id: 'son',     icon: '💄', name: 'Son môi',    price: 800,  down: 10, happy: 4, desc: 'Vợ hết giận kha khá! Nghi ngờ -10 💄' },
+  { id: 'tui',     icon: '👜', name: 'Túi xách',   price: 2000, down: 25, happy: 8, desc: 'Vợ nguôi giận hẳn! Nghi ngờ -25 😍' },
 ];
 
 // Nguyên liệu đúng cho mini-game "Vào bếp" (30s)
