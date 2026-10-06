@@ -99,6 +99,30 @@ function addDaysStr(ds, n) {
 }
 function isGoldenHour() { const h = new Date().getHours(); return (h >= 5 && h < 7) || (h >= 16 && h < 18); }
 
+/* ===== Hệ thống đồ đựng cá — chế độ Trốn vợ đi câu =====
+   Luật: câu được cá ở mode vợ KHÔNG bán ngay ở bờ — chỉ "Cho vào đồ đựng"
+   hoặc "Phóng sinh". Về nhà mới được Bán hết / Dâng vợ / Nấu ăn.
+   (Chế độ Câu tự do giữ nguyên: bán ngay ở bờ.) */
+const CONTAINERS = [
+  { id: 'xo',    name: 'Xô ghẻ',   cap: 5,  price: 0,     place: 'bank',
+    icon: '🪣', desc: 'Xô cũ mèm — để trên bờ. Chứa tối đa 5 con.' },
+  { id: 'ro',    name: 'Rọ cá',    cap: 12, price: 15000,  place: 'water',
+    icon: '🧺', desc: 'Rọ tre thả cạnh bờ, ngập xuống nước — cá sống khỏe. Chứa 12 con.' },
+  { id: 'thung', name: 'Thùng cá', cap: 25, price: 50000,  place: 'bank',
+    icon: '🛢️', desc: 'Thùng nhựa to để trên bờ. Chứa 25 con.' },
+];
+function containerById(id) { return CONTAINERS.find(c => c.id === id) || CONTAINERS[0]; }
+
+// Câu hài khi cho cá vào đồ đựng (mode Trốn vợ)
+const FUNNY_KEEP = [
+  'Cho vào {cont}! Tối nay có cá kho tộ... à nhầm, để vợ quyết định 😄',
+  '{cont} lại thêm 1 em! Đầy nhanh thế này vợ lại nghi... 🤫',
+  'Vào {cont} nằm ngoan nhé, chiều về nhà mình tính tiếp 🐟',
+  'Cất kỹ vào {cont} — đây là "hàng cấm" đấy nhé! 😎',
+  '{cont} nặng thêm chút rồi! Tay nghề lên level 📈',
+  'Em vào {cont} trước đi, anh câu thêm vài em nữa rồi về 🏠',
+];
+
 /* ===== Đợt 2: Trốn vợ đi câu ===== */
 
 // Câu hài khi bán cá trong mode Trốn vợ ({price} = số tiền bán được)
