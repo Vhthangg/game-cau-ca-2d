@@ -13,7 +13,9 @@ function defaultSave() {
            // Đợt 2: Trốn vợ đi câu
            suspicion: 0, sincerity: 0, happiness: 0, merit: 0, totalMerit: 0, buffUntil: 0,
            banUntil: '', spendDay: null, basket: [], weekEntries: {}, weekEval: '',
-           wifeApproved: false, titles: [], lateCount: 0 };
+           wifeApproved: false, titles: [], lateCount: 0,
+           // Bảng xếp hạng
+           totalEarned: 0, biggestFish: 0, playerName: '', lbSent: 0 };
 }
 let S;
 try { S = Object.assign(defaultSave(), JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); }
@@ -107,7 +109,7 @@ let lastClockMin = -1;        // phút game đã hiển thị trên HUD (tránh 
 /* ---------- DOM helper ---------- */
 const $ = id => document.getElementById(id);
 const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-dig', 'pop-result', 'scr-map', 'scr-quest',
-  'scr-call', 'scr-wifehome', 'scr-kitchen'];
+  'scr-call', 'scr-wifehome', 'scr-kitchen', 'scr-leaderboard', 'scr-name'];
 function show(id) {
   screens.forEach(s => $(s).classList.toggle('hidden', s !== id));
   $('hud').classList.toggle('hidden', !(id === null && isFishing()));
@@ -593,6 +595,7 @@ function fightWin() {
   // Đếm cá cho cấp độ & mở khóa map
   S.totalFish = (S.totalFish || 0) + 1;
   if (S.map === 'ao') S.caughtAo = (S.caughtAo || 0) + 1;
+  if (lastWeight > (S.biggestFish || 0)) S.biggestFish = lastWeight; // BXH: cá to nhất
   save();
   questEvent('catch', { fishId: fish.id, weight: lastWeight, map: S.map, spot: spot && spot.id, bait: S.bait });
   fight = null; phase = 'RESULT';
@@ -837,8 +840,9 @@ bindClick('btn-wh-end', enterMenu);
 bindClick('btn-dig', () => enterDig(false));
 bindClick('btn-buy-cam-prep', () => buyCam());
 bindClick('btn-sell', () => {
-  S.money += lastPrice; save(); Sfx.sell();
+  S.money += lastPrice; S.totalEarned = (S.totalEarned || 0) + lastPrice; save(); Sfx.sell();
   questEvent('sell');
+  lbAfterSell(); // gửi điểm BXH ngầm
   toast('Đã bán cá +' + fmt(lastPrice) + '!');
   $('pop-result').classList.add('hidden');
   afterAttempt();
@@ -846,8 +850,9 @@ bindClick('btn-sell', () => {
 // Đợt 2: 3 lựa chọn sau khi câu được cá trong mode Trốn vợ
 bindClick('btn-wife-sell', () => {
   const price = lastPrice;
-  S.money += price; save(); Sfx.sell();
+  S.money += price; S.totalEarned = (S.totalEarned || 0) + price; save(); Sfx.sell();
   questEvent('sell');
+  lbAfterSell(); // gửi điểm BXH ngầm
   addSuspicion(5, 'tiền bán cá giấu ở đâu?');
   showFunny(funny(FUNNY_SELL, { price: fmt(price) }));
 });
@@ -1136,6 +1141,97 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
+/* ---------- Bảng xếp hạng (Vercel Blob, /api/leaderboard) ---------- */
+const LB_URL = '/api/leaderboard';
+const LB_MEDAL = ['🥇', '🥈', '🥉'];
+function lbName() { return (S.playerName || '').trim(); }
+function randomAnglerName() { return 'Cần thủ ' + Math.floor(100 + Math.random() * 900); }
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function enterLeaderboard() {
+  phase = 'LB';
+  show('scr-leaderboard');
+  if (!lbName()) enterName(true); // lần đầu: hỏi tên trước
+  else loadBoard();
+}
+// Nhập/đổi tên cần thủ. fromBoard=true: xong thì quay lại tải BXH.
+let lbNameReturn = false;
+function enterName(fromBoard) {
+  lbNameReturn = !!fromBoard;
+  $('lb-name-input').value = lbName() || randomAnglerName();
+  show('scr-name');
+  setTimeout(() => { try { $('lb-name-input').select(); } catch (e) {} }, 60);
+}
+async function loadBoard() {
+  const st = $('lb-status'), list = $('lb-list'), me = $('lb-me');
+  st.classList.remove('hidden'); list.innerHTML = '';
+  st.textContent = '⏳ Đang tải bảng xếp hạng...';
+  me.classList.add('hidden');
+  try {
+    const r = await fetch(LB_URL, { cache: 'no-store' });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const data = await r.json();
+    renderBoard(data.top || []);
+  } catch (e) {
+    // Chế độ offline: báo nhẹ, game vẫn chơi bình thường
+    st.textContent = '📡 Chưa kết nối được bảng xếp hạng — chơi tiếp nhé!';
+  }
+}
+function renderBoard(top) {
+  const st = $('lb-status'), list = $('lb-list'), me = $('lb-me');
+  st.classList.add('hidden');
+  const name = lbName();
+  if (!top.length) {
+    list.innerHTML = '<p class="subtitle">Chưa có ai trên bảng — bạn sẽ là người đầu tiên? 🎣</p>';
+  } else {
+    list.innerHTML = top.map((e, i) => {
+      const isMe = e.name === name;
+      const pos = LB_MEDAL[i] || ('<span class="lb-rank">' + (i + 1) + '</span>');
+      return '<div class="lb-row' + (isMe ? ' lb-me-row' : '') + '">' +
+        '<span class="lb-pos">' + pos + '</span>' +
+        '<span class="lb-who"><b>' + escHtml(e.name) + '</b>' +
+        '<small>⭐ Cấp ' + (e.level || 1) + ' • 🐟 ' + (Number(e.bigFish) || 0).toFixed(2) + ' kg</small></span>' +
+        '<span class="lb-score">' + fmt(e.score) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+  const mine = top.findIndex(e => e.name === name);
+  me.classList.remove('hidden');
+  me.innerHTML = '🎣 <b>' + escHtml(name) + '</b> — tổng đã kiếm: <b>' + fmt(S.totalEarned || 0) + '</b>' +
+    ' • cá to nhất: <b>' + (Number(S.biggestFish) || 0).toFixed(2) + ' kg</b>' +
+    (mine >= 0 ? ' • hạng <b>#' + (mine + 1) + '</b> 🏅' : '');
+}
+// Gửi điểm ngầm sau mỗi lần bán cá — chỉ gửi khi điểm cao hơn lần trước, thất bại bỏ qua lặng lẽ
+let lbSending = false;
+async function lbAfterSell() {
+  const cur = S.totalEarned || 0;
+  if (cur <= 0 || cur <= (S.lbSent || 0)) return;
+  if (!lbName() || lbSending) return;
+  lbSending = true;
+  try {
+    const r = await fetch(LB_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: lbName(), score: cur, bigFish: S.biggestFish || 0, level: level() }),
+    });
+    if (r.ok) { S.lbSent = cur; save(); }
+  } catch (e) { /* offline: thử lại lần bán sau */ }
+  lbSending = false;
+}
+bindClick('btn-to-leaderboard', enterLeaderboard);
+bindClick('btn-lb-back', enterMenu);
+bindClick('btn-lb-reload', () => loadBoard());
+bindClick('btn-lb-name', () => enterName(false));
+bindClick('btn-name-ok', () => {
+  const v = $('lb-name-input').value.replace(/[<>&"']/g, '').trim().slice(0, 20);
+  if (!v) { toast('Nhập tên đi bạn ơi!'); return; }
+  S.playerName = v; save();
+  if (lbNameReturn) { lbNameReturn = false; enterLeaderboard(); }
+  else { enterMenu(); toast('Đã đổi tên thành ' + v + '!'); }
+});
+
 /* ---------- Khởi động ---------- */
 $('dig-from-shop') || (function () {
   const inp = document.createElement('input');
@@ -1188,6 +1284,8 @@ window.__dbg = {
   phase: () => phase,
   strike: () => strike ? { pos: strike.pos, zc: strike.zc, zw: strike.zw } : null,
   fight: () => fight ? { tension: fight.tension, zc: fight.zc } : null,
+  lb: () => ({ name: lbName(), totalEarned: S.totalEarned || 0, lbSent: S.lbSent || 0,
+               biggestFish: S.biggestFish || 0 }),
 };
 
 })();
