@@ -410,3 +410,22 @@ body.is-portrait #pop-result .panel { max-width: 100%; }
   background: #fff; color: var(--ink); text-align: center;
 }
 .text-input:focus { outline: 3px solid var(--sun-500); border-color: var(--brand-500); }
+
+/* ============ Hệ thống đồ đựng cá (mode Trốn vợ) ============ */
+.cont-icon { font-size: 34px; display: block; margin: 2px 0 4px; }
+.kept-list {
+  display: flex; flex-direction: column; gap: 6px; margin: 8px 0;
+  max-height: 40vh; overflow-y: auto; padding: 2px; text-align: left;
+}
+.kept-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 2px solid var(--earth-200); border-radius: var(--r-md);
+  padding: 6px 12px; font-size: 14px;
+}
+.kept-row .kept-ico { font-size: 22px; flex: 0 0 auto; }
+.kept-row .kept-who { flex: 1; min-width: 0; }
+.kept-row .kept-who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kept-row .kept-who small { color: var(--muted); }
+.kept-row .kept-price { font-weight: bold; color: var(--gold); white-space: nowrap; }
+.kept-empty { color: var(--muted); font-style: italic; padding: 10px; }
+#cont-sub { margin: 2px 0 6px; }

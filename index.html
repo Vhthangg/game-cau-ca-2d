@@ -19,6 +19,7 @@
     <span id="hud-rod" class="pill">🎣 Cần tre</span>
     <span id="hud-clock" class="pill hidden">🕐 15:00</span>
     <span id="hud-susp" class="pill hidden">😒 0</span>
+    <span id="hud-container" class="pill hidden">🪣 0/5</span>
     <span id="hud-buff" class="pill hidden">🍀</span>
     <button id="btn-home" class="icon-btn" title="Về menu chính">🏠</button>
   </div>
@@ -121,6 +122,8 @@
           </div>
         </div>
         <p id="prep-nobait-hint" class="warn hidden">⚠️ Hết mồi! Hãy đào giun hoặc mua cám rồi quay lại.</p>
+        <h3 id="prep-cont-title" class="hidden">🪣 Đồ đựng cá <small>(mode Trốn vợ: về nhà mới được bán)</small></h3>
+        <div id="container-list" class="cards hidden"></div>
         <div class="row">
           <button id="btn-prep-back" class="btn ghost">← Quay lại</button>
           <button id="btn-go-fish" class="btn big">Chọn điểm câu →</button>
@@ -148,6 +151,8 @@
         <div id="shop-rods" class="cards"></div>
         <h3>Mồi câu</h3>
         <div id="shop-baits" class="cards"></div>
+        <h3>🪣 Đồ đựng cá <small>(mode Trốn vợ)</small></h3>
+        <div id="shop-containers" class="cards"></div>
         <div class="row">
           <button id="btn-shop-back" class="btn ghost">← Quay lại</button>
         </div>
@@ -168,7 +173,7 @@
           <li><b>Sông quê</b> (mở khi câu 15 con ở ao hoặc đạt cấp 2): chọn 1 trong 3 điểm câu — Bến đò (dễ), Gầm cầu (vừa), Bãi bồi (dòng xiết, khó). Mồi nhẹ ở chỗ xiết sẽ bị trôi, tỉ lệ cắn giảm!</li>
           <li><b>Thời tiết & giờ vàng:</b> sau mưa cá ăn mạnh hơn; 5–7h sáng và 16–18h là giờ vàng câu cá.</li>
           <li><b>Cấp cần thủ</b> tăng theo tổng số cá đã câu — mở khóa map và cần mới. <b>Nhiệm vụ ngày</b> cho thưởng mỗi ngày, đừng quên nhận!</li>
-          <li><b>😎 Trốn vợ đi câu:</b> vợ đặt <b>giờ giới nghiêm</b> mỗi chuyến (đồng hồ game chạy nhanh: 1 phút thật = 15 phút game). Về trễ +15 nghi ngờ mỗi 30 phút! Giữa chuyến vợ có thể <b>gọi điện kiểm tra</b> — nói thật hay nói dối là tùy bạn... Câu được cá thì chọn: <b>bán ngay</b> (có tiền nhưng +nghi ngờ), <b>mang về nịnh vợ</b> (giảm nghi ngờ khi dâng cá), hoặc <b>phóng sinh</b> tích phúc đức (đủ 10 điểm được buff "Cá lớn phù hộ"). Về nhà có thể <b>vào bếp</b> nấu ăn hoặc <b>mua quà</b> tặng vợ. Nghi ngờ ≥ 80 là <b>bị cấm câu 2 ngày</b>!</li>
+          <li><b>😎 Trốn vợ đi câu:</b> vợ đặt <b>giờ giới nghiêm</b> mỗi chuyến (đồng hồ game chạy nhanh: 1 phút thật = 15 phút game). Về trễ +15 nghi ngờ mỗi 30 phút! Giữa chuyến vợ có thể <b>gọi điện kiểm tra</b> — nói thật hay nói dối là tùy bạn... Câu được cá thì chọn: <b>cho vào đồ đựng</b> (🪣 Xô ghẻ mặc định chứa 5 con; mua 🧺 Rọ cá thả xuống nước chứa 12 con, 🛢️ Thùng cá chứa 25 con ở shop — chạm vào đồ đựng trong scene để xem cá đang giữ) hoặc <b>phóng sinh</b> tích phúc đức (đủ 10 điểm được buff "Cá lớn phù hộ"). <b>Về nhà mới được bán</b> (có tiền nhưng +nghi ngờ), <b>dâng vợ</b> nịnh (+hạnh phúc, -nghi ngờ) hoặc <b>vào bếp</b> nấu ăn (tốn 1 con cá). Nghi ngờ ≥ 80 là <b>bị cấm câu 2 ngày</b>!</li>
         </ol>
         <button id="btn-help-back" class="btn">Đã hiểu!</button>
       </div>
@@ -188,8 +193,7 @@
           <button id="btn-sell" class="btn big">💰 Bán cá</button>
         </div>
         <div class="choice-col hidden" id="res-row-wife">
-          <button id="btn-wife-sell" class="btn big">💰 Bán ngay</button>
-          <button id="btn-wife-gift" class="btn big gift">🎁 Mang về nịnh vợ</button>
+          <button id="btn-wife-keep" class="btn big">🪣 Cho vào xô</button>
           <button id="btn-wife-release" class="btn big ghost">🙏 Phóng sinh</button>
         </div>
         <div class="row hidden" id="res-row-wife-done">
@@ -215,11 +219,12 @@
         <h2>🏠 Về nhà</h2>
         <p class="subtitle">😒 Nghi ngờ: <b id="wh-susp">0</b> &nbsp;•&nbsp; 😍 Hạnh phúc: <b id="wh-happy">0</b></p>
         <div id="wh-titles" class="titles"></div>
-        <h3>🧺 Giỏ cá mang về (<span id="wh-basket-n">0</span>)</h3>
-        <div id="wh-basket" class="cards"></div>
+        <h3>🎣 Cá mang về (<span id="wh-kept-n">0</span>/<span id="wh-kept-cap">5</span>)</h3>
+        <div id="wh-kept" class="cards"></div>
         <div class="row">
-          <button id="btn-offer-fish" class="btn big gift">🎁 Dâng cá cho vợ</button>
-          <button id="btn-kitchen" class="btn big">👨‍🍳 Vào bếp nấu ăn</button>
+          <button id="btn-sell-kept" class="btn big">💰 Bán hết</button>
+          <button id="btn-offer-fish" class="btn big gift">🎁 Dâng vợ</button>
+          <button id="btn-kitchen" class="btn big">👨‍🍳 Nấu ăn (1 con)</button>
         </div>
         <h3>🎁 Quà cho vợ</h3>
         <div id="wh-gifts" class="cards"></div>
@@ -227,6 +232,19 @@
         <div id="wh-weekly" class="week-card"></div>
         <div class="row">
           <button id="btn-wh-end" class="btn big primary">Kết thúc ngày →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup xem đồ đựng cá (chạm vào xô/rọ/thùng trong scene) -->
+    <div id="scr-container" class="screen hidden">
+      <div class="panel">
+        <h2 id="cont-title">🪣 Xô ghẻ</h2>
+        <p class="subtitle" id="cont-sub"></p>
+        <div id="cont-list" class="kept-list"></div>
+        <p class="money-line" id="cont-total"></p>
+        <div class="row">
+          <button id="btn-cont-close" class="btn big primary">Đóng</button>
         </div>
       </div>
     </div>
