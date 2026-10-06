@@ -360,6 +360,8 @@ function renderPrepare() {
   const hasBait = (S.bait === 'giun' && S.giun > 0) || (S.bait === 'cam' && S.cam > 0);
   $('btn-go-fish').disabled = !hasBait;
   $('prep-nobait-hint').classList.toggle('hidden', hasBait);
+  $('btn-dig').textContent = digLabel();
+  $('btn-dig').disabled = digsLeft() <= 0;
 }
 function enterPrepare() { phase = 'PREPARE'; show('scr-prepare'); renderPrepare(); }
 
@@ -372,16 +374,26 @@ function renderShop() {
     '<button class="btn small" data-act="buycam"' + (S.money < CAM_PRICE ? ' disabled' : '') + '>Mua ' + fmt(CAM_PRICE) + '</button>' +
     '<br><a href="#" class="aff-link" data-item="Cám câu">🛒 Mua ngoài đời</a></div>' +
     '<div class="card"><div class="card-title">🪱 Giun đất <span class="count">x' + S.giun + '</span></div>' +
-    '<div class="card-desc">Miễn phí — tự tay đào mới có!</div>' +
-    '<button class="btn small" data-act="dig">⛏️ Đào giun</button></div>';
+    '<div class="card-desc">Miễn phí — tự tay đào mới có! Còn ' + digsLeft() + '/' + DIG.perDay + ' lượt hôm nay.</div>' +
+    '<button class="btn small" data-act="dig"' + (digsLeft() <= 0 ? ' disabled' : '') + '>' + digLabel() + '</button></div>';
 }
 
 /* ---------- Mini-game đào giun ---------- */
 let digTimers = [];
+// Số lượt đào còn lại trong ngày (giới hạn độ khó — giun không còn vô hạn)
+function digsLeft() {
+  const t = todayStr();
+  if (!S.digDay || S.digDay.date !== t) S.digDay = { date: t, count: 0 };
+  return Math.max(0, DIG.perDay - S.digDay.count);
+}
+function digLabel() { return '⛏️ Đào giun (' + digsLeft() + '/' + DIG.perDay + ')'; }
 function enterDig(fromShop) {
+  if (digsLeft() <= 0) { toast('😮‍💨 Tay đã mỏi, mai đào tiếp nhé! (tối đa ' + DIG.perDay + ' lượt/ngày)'); return; }
+  S.digDay.count++; save();
+  $('dig-left').textContent = 'Lượt đào còn lại hôm nay: ' + digsLeft() + '/' + DIG.perDay;
   phase = 'DIG'; show('scr-dig');
   $('dig-from-shop').value = fromShop ? '1' : '';
-  let dug = 0, timeLeft = 20;
+  let dug = 0, timeLeft = DIG.time;
   const grid = $('dig-grid'); grid.innerHTML = '';
   const cells = [];
   for (let i = 0; i < 16; i++) {
@@ -395,8 +407,8 @@ function enterDig(fromShop) {
     if (!free.length) return;
     const c = free[Math.floor(Math.random() * free.length)];
     c.classList.add('active'); c.textContent = '🪱';
-    setTimeout(() => { c.classList.remove('active'); c.textContent = '🟤'; }, 950);
-  }, 620);
+    setTimeout(() => { c.classList.remove('active'); c.textContent = '🟤'; }, DIG.activeMs);
+  }, DIG.popMs);
   const tick = setInterval(() => {
     timeLeft--; $('dig-time').textContent = timeLeft;
     if (timeLeft <= 0) endDig();
@@ -404,7 +416,7 @@ function enterDig(fromShop) {
   grid.onclick = e => {
     const c = e.target.closest('.dig-cell');
     if (c && c.classList.contains('active')) {
-      const got = 2 + Math.floor(Math.random() * 4); // 2-5 con
+      const got = DIG.minYield + Math.floor(Math.random() * (DIG.maxYield - DIG.minYield + 1));
       dug += got; $('dig-count').textContent = dug;
       c.classList.remove('active'); c.textContent = '🟤';
       Sfx.click();
@@ -537,10 +549,12 @@ function biteAnim(pattern, t) {
 
 function startStrike() {
   const r = rod();
-  const zw = clamp(0.16 + r.sense * 0.24 - fish.diff * 0.08, 0.10, 0.40);
+  // Cá khó (diff cao): vùng xanh hẹp hơn, thanh chạy nhanh hơn
+  const zw = clamp(0.16 + r.sense * 0.24 - fish.diff * 0.12, 0.08, 0.40);
+  const dur = Math.max(1.0, 1.5 - fish.diff * 0.6);
   let zc = rnd(0.30, 0.78);
   zc = clamp(zc, zw / 2 + 0.03, 1 - zw / 2 - 0.03);
-  strike = { pos: 0, dur: 1.5, zc, zw };
+  strike = { pos: 0, dur, zc, zw };
   phase = 'STRIKE';
 }
 
@@ -558,13 +572,14 @@ function strikeMiss(msg) {
 
 function startFight() {
   const r = rod(), d = fish.diff;
+  // Cá khó: giãy mạnh hơn (amp, speed, surge), vùng an toàn hẹp hơn, lên cá chậm hơn
   fight = {
     tension: 0.35, prog: 0, zt: 0,
-    amp: 0.10 + d * 0.16,
-    speed: 1.6 + d * 2.2,
-    zw: clamp(0.36 - d * 0.14 + r.line * 0.08, 0.16, 0.44),
-    zc: 0.5, surge: 0,
-    fill: 0.22 + r.line * 0.10,
+    amp: 0.12 + d * 0.20,
+    speed: 1.8 + d * 2.6,
+    zw: clamp(0.34 - d * 0.18 + r.line * 0.08, 0.14, 0.44),
+    zc: 0.5, surge: 0, diff: d,
+    fill: 0.20 + r.line * 0.10,
     breakT: 0, slackT: 0, surgeT: rnd(0.8, 1.6),
   };
   phase = 'FIGHT';
@@ -982,7 +997,7 @@ function update(dt) {
     // cá giãy: giật vùng an toàn ngẫu nhiên
     f.surgeT -= dt;
     if (f.surgeT <= 0) {
-      f.surge = rnd(-0.28, 0.28);
+      f.surge = rnd(-1, 1) * (0.15 + (f.diff || 0) * 0.20); // cá to giãy mạnh hơn
       f.surgeT = rnd(0.8, 1.8);
       splashes.push({ x: fx + rnd(-24, 24), y: fy + rnd(-8, 8), r: 5, a: 0.9 });
       Sfx.splash();
