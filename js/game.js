@@ -8,13 +8,21 @@ const ctx = cv.getContext('2d');
 /* ---------- Lưu trữ ---------- */
 const SAVE_KEY = 'cauCaAoLang_v1';
 function defaultSave() {
-  return { money: START_MONEY, rods: ['tre'], rod: 'tre', giun: 5, cam: 0, bait: 'giun', muted: false };
+  return { money: START_MONEY, rods: ['tre'], rod: 'tre', giun: 5, cam: 0, bait: 'giun',
+           muted: false, totalFish: 0, caughtAo: 0, map: 'ao', quests: null };
 }
 let S;
 try { S = Object.assign(defaultSave(), JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); }
 catch (e) { S = defaultSave(); }
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 function rod() { return RODS.find(r => r.id === S.rod) || RODS[0]; }
+// Cấp cần thủ: floor(tổng cá đã câu / 10) + 1, tối đa 15
+function level() { return Math.min(15, Math.floor((S.totalFish || 0) / 10) + 1); }
+function mapUnlocked(id) {
+  if (id === 'ao') return true;
+  if (id === 'song') return (S.caughtAo || 0) >= 15 || level() >= 2;
+  return false;
+}
 Sfx.muted = !!S.muted;
 
 /* ---------- Trạng thái game ---------- */
@@ -30,16 +38,18 @@ let splashes = [];            // hạt nước
 let hint = null;              // chữ gợi ý trên canvas
 let lastPrice = 0, lastWeight = 0;
 let toastTimer = null;
+let spot = null;              // điểm câu sông quê đang chọn (object RIVER_SPOTS)
+let session = { weather: 'nang', golden: false }; // thời tiết & giờ vàng của phiên câu
 
 /* ---------- DOM helper ---------- */
 const $ = id => document.getElementById(id);
-const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-dig', 'pop-result'];
+const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-dig', 'pop-result', 'scr-map', 'scr-quest'];
 function show(id) {
   screens.forEach(s => $(s).classList.toggle('hidden', s !== id));
   $('hud').classList.toggle('hidden', !(id === null && isFishing()));
 }
 function isFishing() {
-  return ['CAST', 'WAIT', 'BITE', 'STRIKE', 'FIGHT', 'RESULT'].includes(phase);
+  return ['SPOT', 'CAST', 'WAIT', 'BITE', 'STRIKE', 'FIGHT', 'RESULT'].includes(phase);
 }
 let toastToken = 0;
 function toast(msg, ms) {
@@ -59,37 +69,171 @@ function toast(msg, ms) {
 }
 function updateHUD() {
   $('hud-money').textContent = '💰 ' + fmt(S.money);
+  $('hud-level').textContent = '⭐ Cấp ' + level();
+  $('hud-map').textContent = mapName(S.map);
+  const w = $('hud-weather');
+  if (isFishing()) {
+    w.classList.remove('hidden');
+    w.textContent = (session.weather === 'mua' ? '🌧️ Vừa mưa' : '☀️ Nắng') + (session.golden ? ' ⚡GIỜ VÀNG' : '');
+  } else w.classList.add('hidden');
   $('hud-giun').textContent = '🪱 ' + S.giun;
   $('hud-cam').textContent = '🟤 ' + S.cam;
   $('hud-rod').textContent = '🎣 ' + rod().name;
-  $('menu-money').textContent = '💰 ' + fmt(S.money);
+  $('menu-money').textContent = fmt(S.money);
+  $('menu-level').textContent = 'Cấp ' + level();
+  updateQuestBadge();
 }
 
 /* ---------- Màn hình ---------- */
-function enterMenu() { phase = 'MENU'; show('scr-menu'); updateHUD(); }
+function enterMenu() { phase = 'MENU'; show('scr-menu'); ensureDailyQuests(); updateHUD(); }
 function enterHelp() { phase = 'HELP'; show('scr-help'); }
 function enterShop() { phase = 'SHOP'; show('scr-shop'); renderShop(); }
+
+/* ---------- Chọn map ---------- */
+function renderMapSelect() {
+  $('map-list').innerHTML = MAPS.map(m => {
+    const un = mapUnlocked(m.id);
+    return '<div class="card map-card' + (un ? '' : ' locked') + '" data-map="' + m.id + '">' +
+      '<span class="map-icon">' + (un ? m.icon : '🔒') + '</span>' +
+      '<div class="card-title">' + m.name + '</div>' +
+      '<div class="card-desc">' + m.desc + '</div>' +
+      (un ? '' : '<div class="lock-line">🔒 Mở khóa: câu 15 con ở ao làng hoặc đạt cấp 2</div>') +
+      '</div>';
+  }).join('');
+}
+function enterMapSelect() { phase = 'MAP'; show('scr-map'); renderMapSelect(); }
+
+/* ---------- Vào phiên câu ---------- */
+function enterFish(mapId) {
+  S.map = mapId; spot = null; save();
+  // Thời tiết ngẫu nhiên mỗi phiên: 25% vừa mưa xong → cá ăn mạnh
+  session.weather = Math.random() < 0.25 ? 'mua' : 'nang';
+  session.golden = isGoldenHour();
+  if (session.weather === 'mua') setTimeout(() => toast('🌧️ Trời vừa tạnh mưa — cá đang ăn mạnh!'), 600);
+  if (session.golden) setTimeout(() => toast('⚡ GIỜ VÀNG câu cá! Tỉ lệ cắn tăng.'), 1400);
+  if (mapId === 'song') {
+    phase = 'SPOT'; show(null); updateHUD();
+    hint = 'Chạm vào 1 trong 3 điểm câu!';
+  } else {
+    enterCast();
+  }
+}
+
+/* ---------- Nhiệm vụ ngày ---------- */
+function ensureDailyQuests() {
+  const t = todayStr();
+  if (S.quests && S.quests.date === t) return;
+  // Chọn ngẫu nhiên 3 nhiệm vụ khác nhau từ pool
+  const pool = QUEST_POOL.slice();
+  const items = [];
+  for (let i = 0; i < QUESTS_PER_DAY && pool.length; i++) {
+    const q = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    items.push({ qid: q.qid, progress: 0, done: false, claimed: false, set: [] });
+  }
+  S.quests = { date: t, items };
+  save();
+}
+function questDef(qid) { return QUEST_POOL.find(q => q.qid === qid); }
+function questRewardText(q) {
+  const r = q.reward, parts = [];
+  if (r.money) parts.push(fmt(r.money));
+  if (r.cam) parts.push(r.cam + ' cám');
+  if (r.giun) parts.push(r.giun + ' giun');
+  return parts.join(' + ');
+}
+// Ghi nhận sự kiện cho nhiệm vụ. kind: catch | sell | miss
+function questEvent(kind, d) {
+  ensureDailyQuests();
+  d = d || {};
+  let changed = false, completed = null;
+  S.quests.items.forEach(it => {
+    if (it.done) return;
+    const q = questDef(it.qid);
+    const adv = n => { it.progress = Math.min(q.target, it.progress + n); changed = true; };
+    switch (q.type) {
+      case 'catch_any':     if (kind === 'catch') adv(1); break;
+      case 'catch_species': if (kind === 'catch' && d.fishId === q.species) adv(1); break;
+      case 'big_fish':      if (kind === 'catch' && d.weight >= q.minW) adv(1); break;
+      case 'use_baits':
+        if (kind === 'catch' && !it.set.includes(d.bait)) { it.set.push(d.bait); adv(1); }
+        break;
+      case 'spots':
+        if (kind === 'catch' && d.map === 'song' && d.spot && !it.set.includes(d.spot)) { it.set.push(d.spot); adv(1); }
+        break;
+      case 'catch_map':     if (kind === 'catch' && d.map === q.map) adv(1); break;
+      case 'sell':          if (kind === 'sell') adv(1); break;
+      case 'streak':
+        if (kind === 'catch') adv(1);
+        else if (kind === 'miss') { if (it.progress > 0) { it.progress = 0; changed = true; } }
+        break;
+    }
+    if (!it.done && it.progress >= q.target) { it.done = true; changed = true; completed = q; }
+  });
+  if (changed) save();
+  if (completed) { Sfx.caught(); toast('🎯 Hoàn thành: ' + completed.text + ' — vào Nhiệm vụ nhận thưởng!'); }
+  updateQuestBadge();
+}
+function updateQuestBadge() {
+  ensureDailyQuests();
+  const n = S.quests.items.filter(it => it.done && !it.claimed).length;
+  const b = $('quest-badge');
+  if (b) { b.textContent = n; b.classList.toggle('hidden', n === 0); }
+}
+function renderQuests() {
+  ensureDailyQuests();
+  $('quest-list').innerHTML = S.quests.items.map(it => {
+    const q = questDef(it.qid);
+    const pct = Math.round(it.progress / q.target * 100);
+    let btn;
+    if (it.claimed) btn = '<button class="btn small" disabled>Đã nhận ✓</button>';
+    else if (it.done) btn = '<button class="btn small" data-qclaim="' + it.qid + '">🎁 Nhận thưởng</button>';
+    else btn = '<button class="btn small" disabled>Chưa xong</button>';
+    return '<div class="card quest-card' + (it.done ? ' done' : '') + (it.claimed ? ' claimed' : '') + '">' +
+      '<div class="card-title">🎯 ' + q.text + '</div>' +
+      '<div class="qbar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="qprog">Tiến độ: ' + it.progress + '/' + q.target + '</div>' +
+      '<div class="qreward">Thưởng: ' + questRewardText(q) + '</div>' + btn + '</div>';
+  }).join('');
+}
+function enterQuest() { phase = 'QUEST'; show('scr-quest'); renderQuests(); }
+function claimQuest(qid) {
+  const it = S.quests.items.find(x => x.qid === qid);
+  if (!it || !it.done || it.claimed) return;
+  const r = questDef(qid).reward;
+  if (r.money) S.money += r.money;
+  if (r.cam) S.cam += r.cam;
+  if (r.giun) S.giun += r.giun;
+  it.claimed = true; save();
+  Sfx.sell(); toast('🎁 Nhận thưởng: ' + questRewardText(questDef(qid)) + '!');
+  renderQuests(); updateHUD();
+}
 
 function statBar(lbl, v) {
   return '<div class="stat"><span class="lbl">' + lbl + '</span><div class="bar"><i style="width:' +
     Math.round(v * 100) + '%"></i></div></div>';
 }
 
+function rodCard(r, forShop) {
+  const owned = S.rods.includes(r.id), using = S.rod === r.id;
+  const locked = level() < (r.reqLevel || 1);
+  const typeTag = r.type === 'may' ? ' <span class="count">[máy]</span>' : ' <span class="count">[đài]</span>';
+  let btn;
+  if (using) btn = '<button class="btn small" disabled>Đang dùng</button>';
+  else if (locked) btn = '<button class="btn small" disabled>🔒 Cấp ' + r.reqLevel + ' mở khóa</button>';
+  else if (owned) btn = '<button class="btn small" data-act="equip" data-id="' + r.id + '">Dùng</button>';
+  else btn = '<button class="btn small" data-act="buyrod" data-id="' + r.id + '"' +
+    (S.money < r.price ? ' disabled' : '') + '>Mua ' + fmt(r.price) + '</button>';
+  return '<div class="card' + (using ? ' selected' : '') + (owned ? ' owned' : '') + '">' +
+    '<div class="card-title">🎣 ' + r.name + typeTag + '</div>' +
+    statBar('Tầm quăng', r.cast) + statBar('Độ nhạy', r.sense) + statBar('Độ bền', r.line) +
+    '<div class="card-desc">' + r.desc + '</div>' + btn +
+    (forShop ? '<br><a href="#" class="aff-link" data-item="' + r.name + '">🛒 Mua ngoài đời</a>' : '') + '</div>';
+}
+
 function renderPrepare() {
   $('prep-money').textContent = '💰 ' + fmt(S.money);
   // Cần
-  $('rod-list').innerHTML = RODS.map(r => {
-    const owned = S.rods.includes(r.id), using = S.rod === r.id;
-    let btn;
-    if (using) btn = '<button class="btn small" disabled>Đang dùng</button>';
-    else if (owned) btn = '<button class="btn small" data-act="equip" data-id="' + r.id + '">Dùng</button>';
-    else btn = '<button class="btn small" data-act="buyrod" data-id="' + r.id + '"' +
-      (S.money < r.price ? ' disabled' : '') + '>Mua ' + fmt(r.price) + '</button>';
-    return '<div class="card' + (using ? ' selected' : '') + (owned ? ' owned' : '') + '">' +
-      '<div class="card-title">🎣 ' + r.name + '</div>' +
-      statBar('Tầm quăng', r.cast) + statBar('Độ nhạy', r.sense) + statBar('Độ bền', r.line) +
-      '<div class="card-desc">' + r.desc + '</div>' + btn + '</div>';
-  }).join('');
+  $('rod-list').innerHTML = RODS.map(r => rodCard(r, false)).join('');
   // Mồi
   $('bait-giun-count').textContent = 'x' + S.giun;
   $('bait-cam-count').textContent = 'x' + S.cam;
@@ -103,19 +247,7 @@ function enterPrepare() { phase = 'PREPARE'; show('scr-prepare'); renderPrepare(
 
 function renderShop() {
   $('shop-money').textContent = '💰 ' + fmt(S.money);
-  $('shop-rods').innerHTML = RODS.map(r => {
-    const owned = S.rods.includes(r.id), using = S.rod === r.id;
-    let btn;
-    if (using) btn = '<button class="btn small" disabled>Đang dùng</button>';
-    else if (owned) btn = '<button class="btn small" data-act="equip" data-id="' + r.id + '">Dùng</button>';
-    else btn = '<button class="btn small" data-act="buyrod" data-id="' + r.id + '"' +
-      (S.money < r.price ? ' disabled' : '') + '>Mua ' + fmt(r.price) + '</button>';
-    return '<div class="card' + (using ? ' selected' : '') + '">' +
-      '<div class="card-title">🎣 ' + r.name + '</div>' +
-      statBar('Tầm quăng', r.cast) + statBar('Độ nhạy', r.sense) + statBar('Độ bền', r.line) +
-      '<div class="card-desc">' + r.desc + '</div>' + btn +
-      '<br><a href="#" class="aff-link" data-item="' + r.name + '">🛒 Mua ngoài đời</a></div>';
-  }).join('');
+  $('shop-rods').innerHTML = RODS.map(r => rodCard(r, true)).join('');
   $('shop-baits').innerHTML =
     '<div class="card"><div class="card-title">🟤 Cám câu <span class="count">x' + S.cam + '</span></div>' +
     '<div class="card-desc">' + fmt(CAM_PRICE) + ' / gói ' + CAM_PACK + ' viên — cá cắn nhanh hơn giun.</div>' +
@@ -176,7 +308,10 @@ function enterCast(msg) {
   phase = 'CAST'; show(null); updateHUD();
   hint = msg || null;
 }
-function waterBounds(x, y) { return x >= 60 && x <= 900 && y >= 215 && y <= 445; }
+function waterBounds(x, y) {
+  if (S.map === 'song') return x >= 60 && x <= 900 && y >= 230 && y <= 430;
+  return x >= 60 && x <= 900 && y >= 215 && y <= 445;
+}
 
 function doCast(x, y) {
   if (!waterBounds(x, y)) { toast('Chạm vào mặt nước để quăng cần!'); return; }
@@ -185,25 +320,43 @@ function doCast(x, y) {
   fx = x; fy = y; hint = null;
   Sfx.splash();
   splashes.push({ x: fx, y: fy, r: 6, a: 0.9 });
+  // Chọn sẵn con cá sẽ cắn để áp hệ số mồi ưa thích / thời tiết / giờ vàng / dòng chảy
+  fish = pickFish();
+  let mult = 1;
+  const mods = [];
+  if (fish.bait === S.bait) { mult *= 0.8; }
+  if (session.weather === 'mua') { mult *= 0.7; mods.push('sau mưa'); }
+  if (session.golden) { mult *= 0.8; mods.push('giờ vàng'); }
+  if (S.map === 'song' && spot) {
+    const drift = spot.flow - BAITS[S.bait].w;
+    if (drift > 0.25) {
+      mult *= 1.67; // tỉ lệ cắn giảm ~40%
+      hint = '⚠️ Dòng xiết! Mồi bị trôi — tỉ lệ cắn giảm.';
+      toast('⚠️ Dòng xiết! Hãy dùng mồi nặng hơn hoặc đổi điểm câu.');
+    }
+  }
   const wt = BAITS[S.bait].wait;
-  waitT = rnd(wt[0], wt[1]);
+  waitT = rnd(wt[0], wt[1]) * mult;
   phase = 'WAIT';
 }
 
 function pickFish() {
+  const pool = FISH.filter(f => f.map === S.map);
   const distFrac = (fx - 60) / 840; // 0 gần .. 1 xa
   let total = 0;
-  const ws = FISH.map(f => {
+  const ws = pool.map(f => {
     let w = f.w * ((distFrac > 0.65 && f.big) ? 2.5 : 1);
+    // Điểm câu sông: cá đặc trưng của điểm dễ gặp hơn
+    if (S.map === 'song' && spot && spot.fish.includes(f.id)) w *= 2.5;
     total += w; return w;
   });
   let r = Math.random() * total;
-  for (let i = 0; i < FISH.length; i++) { r -= ws[i]; if (r <= 0) return FISH[i]; }
-  return FISH[0];
+  for (let i = 0; i < pool.length; i++) { r -= ws[i]; if (r <= 0) return pool[i]; }
+  return pool[0];
 }
 
 function startBite() {
-  fish = pickFish(); biteT = 0;
+  biteT = 0;
   S[S.bait]--; save(); updateHUD();   // tốn 1 mồi
   phase = 'BITE';
   Sfx.bite();
@@ -242,6 +395,22 @@ function biteAnim(pattern, t) {
     case 'loi': // tai tượng: nhấp 1 cái rồi lôi chìm sâu
       dy = dip(t, 0.2, 0.36, 9) + ramp(t, 0.85, 1.2, 30);
       tilt = ramp(t, 0.85, 1.2, 0.7); break;
+    // --- Pattern mới cho cá sông (Đợt 1) ---
+    case 'nganh2': // ngạnh: rung 2 nhịp mạnh rồi im → kéo
+      dy = dip(t, 0.2, 0.34, 13) + dip(t, 0.46, 0.6, 13) + ramp(t, 0.95, 1.2, 24);
+      tilt = ramp(t, 0.95, 1.2, 0.5); break;
+    case 'loinhanh': // thác lác: nhấp 1 cái rồi lôi nhanh
+      dy = dip(t, 0.25, 0.4, 10) + ramp(t, 0.5, 0.95, 26);
+      tilt = ramp(t, 0.5, 0.95, 0.55); break;
+    case 'rungdeu': // tra: rung đều rồi chìm
+      dy = Math.sin(t * 20) * 4 + ramp(t, 0.5, 1.2, 16); break;
+    case 'nhapnhe': // cá he: nhấp nhẹ liên tục
+      dy = dip(t, 0.15, 0.3, 5) + dip(t, 0.45, 0.6, 5) + dip(t, 0.75, 0.9, 5) + ramp(t, 1.0, 1.2, 12);
+      break;
+    case 'hut': // bống tượng: hút phao xuống nhanh
+      dy = ramp(t, 0.4, 0.7, 24); tilt = ramp(t, 0.4, 0.7, 0.4); break;
+    case 'runtan': // cá chốt: rung lăn tăn rồi chìm nhẹ
+      dy = Math.sin(t * 30) * 3 + ramp(t, 0.6, 1.2, 12); break;
   }
   return { dy, tilt };
 }
@@ -263,6 +432,7 @@ function strikeJudge() {
 }
 function strikeMiss(msg) {
   Sfx.fail(); toast(msg);
+  questEvent('miss');
   afterAttempt();
 }
 
@@ -285,6 +455,11 @@ function fightWin() {
   const w = rnd(fish.min, fish.max);
   lastWeight = Math.round(w * 100) / 100;
   lastPrice = Math.round(lastWeight * fish.price);
+  // Đếm cá cho cấp độ & mở khóa map
+  S.totalFish = (S.totalFish || 0) + 1;
+  if (S.map === 'ao') S.caughtAo = (S.caughtAo || 0) + 1;
+  save();
+  questEvent('catch', { fishId: fish.id, weight: lastWeight, map: S.map, spot: spot && spot.id, bait: S.bait });
   fight = null; phase = 'RESULT';
   $('res-title').textContent = '🐟 Dính cá!';
   $('res-name').textContent = fish.name;
@@ -297,6 +472,7 @@ function fightWin() {
 }
 function fightLost(msg) {
   Sfx.fail(); fight = null; toast(msg);
+  questEvent('miss');
   afterAttempt();
 }
 
@@ -322,7 +498,16 @@ function canvasPos(e) {
 }
 function onPress(e) {
   Sfx.init();
-  if (phase === 'CAST') { const p = canvasPos(e); doCast(p.x, p.y); }
+  if (phase === 'SPOT') {
+    const p = canvasPos(e);
+    const s = RIVER_SPOTS.find(s => Math.hypot(p.x - s.x, p.y - s.y) < 60);
+    if (s) {
+      spot = s; Sfx.click();
+      toast('Đã chọn: ' + s.name + ' — ' + s.desc);
+      enterCast();
+    } else toast('Chạm vào 1 trong 3 điểm câu!');
+  }
+  else if (phase === 'CAST') { const p = canvasPos(e); doCast(p.x, p.y); }
   else if (phase === 'BITE') startStrike();       // nhấn sớm: vào luôn thanh nhịp
   else if (phase === 'STRIKE') { Sfx.click(); strikeJudge(); }
   else if (phase === 'FIGHT') holding = true;
@@ -345,17 +530,21 @@ window.addEventListener('keyup', e => {
 /* ---------- Nút bấm ---------- */
 function bindClick(id, fn) { $(id).addEventListener('click', e => { Sfx.init(); Sfx.click(); fn(e); }); }
 bindClick('btn-to-prepare', enterPrepare);
+bindClick('btn-to-quest', enterQuest);
 bindClick('btn-to-shop', enterShop);
 bindClick('btn-to-help', enterHelp);
 bindClick('btn-help-back', enterMenu);
 bindClick('btn-prep-back', enterMenu);
 bindClick('btn-shop-back', enterMenu);
-bindClick('btn-go-fish', () => enterCast());
+bindClick('btn-quest-back', enterMenu);
+bindClick('btn-map-back', enterPrepare);
+bindClick('btn-go-fish', () => enterMapSelect());
 bindClick('btn-home', enterMenu);
 bindClick('btn-dig', () => enterDig(false));
 bindClick('btn-buy-cam-prep', () => buyCam());
 bindClick('btn-sell', () => {
   S.money += lastPrice; save(); Sfx.sell();
+  questEvent('sell');
   toast('Đã bán cá +' + fmt(lastPrice) + '!');
   $('pop-result').classList.add('hidden');
   afterAttempt();
@@ -384,13 +573,24 @@ $('card-cam').addEventListener('click', e => {
 
 // Mua / trang bị (event delegation cho danh sách render động)
 document.addEventListener('click', e => {
+  const m = e.target.closest('[data-map]');
+  if (m) {
+    Sfx.init(); Sfx.click();
+    const mapId = m.dataset.map;
+    if (!mapUnlocked(mapId)) { toast('🔒 Chưa mở khóa! Câu 15 con ở ao làng hoặc đạt cấp 2.'); return; }
+    enterFish(mapId);
+    return;
+  }
+  const q = e.target.closest('[data-qclaim]');
+  if (q) { Sfx.init(); Sfx.click(); claimQuest(q.dataset.qclaim); return; }
   const b = e.target.closest('[data-act]');
   if (!b) return;
   Sfx.init(); Sfx.click();
   const act = b.dataset.act, id = b.dataset.id;
   if (act === 'buyrod') {
     const r = RODS.find(x => x.id === id);
-    if (S.money >= r.price) {
+    if (level() < (r.reqLevel || 1)) { toast('Cần đạt cấp ' + r.reqLevel + ' để mua cần này!'); }
+    else if (S.money >= r.price) {
       S.money -= r.price; S.rods.push(r.id); S.rod = r.id; save();
       Sfx.sell(); toast('Đã mua ' + r.name + '!');
     }
@@ -479,6 +679,7 @@ function render() {
   if (phase === 'WAIT' && !phaseHint) phaseHint = 'Đang chờ cá cắn... 👀 nhìn phao!';
   if (phase === 'BITE') phaseHint = '⚡ Cá cắn! Nhấn ngay!';
   Art.drawScene(ctx, tG, {
+    map: S.map,
     float: showFloat ? { x: fx, y: fy, show: true, dy: fdy, tilt } : { show: false },
     rodBend, splashes, biteFlash,
     castHint: phase === 'CAST',
@@ -486,6 +687,8 @@ function render() {
     hint: (phase === 'CAST' || phase === 'WAIT' || phase === 'BITE') ? phaseHint : null,
     strike: phase === 'STRIKE' ? strike : null,
     fight: phase === 'FIGHT' ? { tension: fight.tension, zc: fight.zc, zw: fight.zw, prog: Math.min(fight.prog, 1) } : null,
+    spots: phase === 'SPOT' ? RIVER_SPOTS : null,
+    spotHint: phase === 'SPOT' ? hint : null,
   });
 }
 
@@ -503,6 +706,25 @@ $('dig-from-shop') || (function () {
   inp.type = 'hidden'; inp.id = 'dig-from-shop';
   document.body.appendChild(inp);
 })();
+
+// Hook cho test tự động — chỉ tồn tại khi mở với ?test=1, không ảnh hưởng gameplay
+if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
+  window.__test = {
+    get phase() { return phase; },
+    get S() { return S; },
+    get fish() { return fish; },
+    get strike() { return strike; },
+    get fight() { return fight; },
+    get spot() { return spot; },
+    get session() { return session; },
+    level, mapUnlocked, ensureDailyQuests, questEvent, pickFish,
+    forceBite() { if (phase === 'WAIT') waitT = 0; },
+    forceStrikeWin() { if (strike) strike.pos = strike.zc; },
+    forceFightWin() { if (fight) fight.prog = 1; },
+    selectSpot(i) { spot = RIVER_SPOTS[i]; },
+  };
+}
+
 enterMenu();
 requestAnimationFrame(loop);
 

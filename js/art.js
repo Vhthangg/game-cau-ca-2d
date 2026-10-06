@@ -96,8 +96,9 @@ const Art = (function () {
     ctx.restore();
   }
 
-  // Vẽ toàn cảnh. v = {t, float, rodBend, splashes, strike, fight, castHint, maxCastX, hint}
+  // Vẽ toàn cảnh. v = {t, map, float, rodBend, splashes, strike, fight, castHint, maxCastX, hint, spots, spotHint}
   function drawScene(ctx, t, v) {
+    if (v.map === 'song') { drawRiverScene(ctx, t, v); return; }
     const W = 960, H = 540;
 
     // --- Trời chiều ---
@@ -178,6 +179,105 @@ const Art = (function () {
     ctx.strokeStyle = '#7f0000'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(707, 492, 17, Math.PI, 0); ctx.stroke();
 
+    drawOverlay(ctx, t, v);
+  }
+
+  // --- Sông quê: mặt sông rộng, dòng chảy, cầu, 3 điểm câu ---
+  function drawRiverScene(ctx, t, v) {
+    const W = 960, H = 540;
+
+    // --- Trời sáng ---
+    const sky = ctx.createLinearGradient(0, 0, 0, 190);
+    sky.addColorStop(0, '#a5d6f5'); sky.addColorStop(1, '#e9f3da');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, 190);
+    ctx.fillStyle = '#fff6c9'; ctx.beginPath(); ctx.arc(150, 66, 24, 0, Math.PI * 2); ctx.fill();
+    clouds.forEach(c => {
+      const x = ((c.x + t * c.v) % (W + 320)) - 160;
+      drawCloud(ctx, x, c.y, c.s);
+    });
+
+    // --- Bờ xa + cầu bê tông ---
+    ctx.fillStyle = '#3e6b34';
+    ctx.beginPath(); ctx.ellipse(480, 168, 520, 36, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4c7d3e';
+    ctx.beginPath(); ctx.ellipse(140, 160, 180, 26, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(830, 162, 190, 28, 0, 0, Math.PI * 2); ctx.fill();
+    drawBamboo(ctx, 90, 185, 110, 14); drawBamboo(ctx, 880, 186, 120, -10);
+    // mặt cầu
+    ctx.fillStyle = '#9e9e9e'; ctx.fillRect(380, 138, 200, 24);
+    ctx.fillStyle = '#757575'; ctx.fillRect(380, 138, 200, 6);
+    ctx.fillStyle = '#8d8d8d';
+    ctx.fillRect(425, 162, 18, 120); ctx.fillRect(537, 162, 18, 120); // trụ cầu
+    ctx.strokeStyle = '#616161'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(380, 138); ctx.lineTo(580, 138); ctx.stroke();
+    for (let x = 390; x <= 570; x += 30) {
+      ctx.beginPath(); ctx.moveTo(x, 138); ctx.lineTo(x, 122); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.moveTo(380, 122); ctx.lineTo(580, 122); ctx.stroke();
+
+    // --- Mặt sông, dòng chảy trôi ngang ---
+    const wg = ctx.createLinearGradient(0, 185, 0, 455);
+    wg.addColorStop(0, '#45a3b8'); wg.addColorStop(0.5, '#2f8a9e'); wg.addColorStop(1, '#237182');
+    ctx.fillStyle = wg; ctx.fillRect(0, 185, W, 270);
+    ctx.strokeStyle = 'rgba(255,255,255,.30)'; ctx.lineWidth = 2;
+    for (let i = 0; i < 7; i++) {
+      const yy = 210 + i * 34;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 20) {
+        const drift = ((x + t * (40 + i * 14)) % (W + 120)) - 60;
+        const yo = Math.sin(drift * 0.05 + i * 1.7) * 4;
+        x === 0 ? ctx.moveTo(x, yy + yo) : ctx.lineTo(x, yy + yo);
+      }
+      ctx.stroke();
+    }
+    // vệt dòng chảy chạy nhanh
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 3;
+    for (let i = 0; i < 10; i++) {
+      const yy = 205 + ((i * 53) % 230);
+      const xx = ((i * 173 + t * 130) % (W + 160)) - 80;
+      ctx.beginPath(); ctx.moveTo(xx, yy); ctx.lineTo(xx + 34, yy); ctx.stroke();
+    }
+
+    // --- Bờ gần: cỏ (trái) + bãi cát bồi (phải) ---
+    ctx.fillStyle = '#7a9a4e'; ctx.fillRect(0, 452, 560, 88);
+    ctx.fillStyle = '#d9c08a'; ctx.fillRect(560, 452, 400, 88);
+    ctx.fillStyle = '#6b8a42'; ctx.fillRect(0, 452, 560, 8);
+    ctx.fillStyle = '#c4a76f'; ctx.fillRect(560, 452, 400, 8);
+    grassTufts.forEach(g => {
+      if (g.x > 560) return;
+      ctx.strokeStyle = '#5d8f46'; ctx.lineWidth = 2;
+      for (let k = -1; k <= 1; k++) {
+        ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.quadraticCurveTo(g.x + k * 4, g.y - 8, g.x + k * 7, g.y - 12); ctx.stroke();
+      }
+    });
+    // cái xô đỏ
+    ctx.fillStyle = '#c62828'; rr(ctx, 690, 492, 34, 30, 4); ctx.fill();
+    ctx.strokeStyle = '#7f0000'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(707, 492, 17, Math.PI, 0); ctx.stroke();
+
+    // --- Điểm câu (phase chọn điểm) ---
+    (v.spots || []).forEach(s => {
+      const pr = (t * 1.6) % 1;
+      ctx.strokeStyle = 'rgba(255,235,59,' + (1 - pr * 0.7) + ')'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 30 + pr * 14, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(20,35,28,.75)';
+      ctx.beginPath(); ctx.arc(s.x, s.y, 26, 0, Math.PI * 2); ctx.fill();
+      // số gợn sóng = độ xiết dòng
+      ctx.strokeStyle = '#4dd0e1'; ctx.lineWidth = 3;
+      const n = 1 + Math.round(s.flow * 2);
+      for (let i = 0; i < n; i++) {
+        const wy = s.y - 8 + i * 9;
+        ctx.beginPath(); ctx.arc(s.x, wy, 7, 0.3, Math.PI - 0.3); ctx.stroke();
+      }
+      pill(ctx, s.name, s.x, s.y - 54);
+    });
+    if (v.spotHint) pill(ctx, v.spotHint, 480, 60);
+
+    drawOverlay(ctx, t, v);
+  }
+
+  // --- Lớp phủ dùng chung: cần, phao, hạt nước, gợi ý, thanh nhịp/lực ---
+  function drawOverlay(ctx, t, v) {
     // --- Cần câu + dây + phao ---
     const f = v.float;
     if (f && f.show) {
@@ -221,8 +321,9 @@ const Art = (function () {
 
     // --- Gợi ý quăng cần ---
     if (v.castHint) {
+      const topY = v.map === 'song' ? 225 : 205, botY = v.map === 'song' ? 435 : 460;
       ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 2; ctx.setLineDash([8, 8]);
-      ctx.beginPath(); ctx.moveTo(v.maxCastX, 205); ctx.lineTo(v.maxCastX, 460); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(v.maxCastX, topY); ctx.lineTo(v.maxCastX, botY); ctx.stroke();
       ctx.setLineDash([]);
       pill(ctx, 'Chạm vào mặt nước để quăng cần', 480, 60);
     }

@@ -30,18 +30,21 @@ Vì đây là web tĩnh (HTML/CSS/JS thuần), deploy rất đơn giản:
 
 ```
 game-cau-ca-2d/
-├── index.html      # Khung trang + các màn hình (menu, chuẩn bị, shop, ...)
-├── style.css       # Giao diện phong cách quê Việt
+├── index.html      # Khung trang + các màn hình (menu, chuẩn bị, map, nhiệm vụ, shop, ...)
+├── style.css       # Giao diện phong cách quê Việt (design tokens)
 ├── js/
-│   ├── config.js   # Dữ liệu: 4 loại cần, 8 loài cá, mồi, giá cả
+│   ├── config.js   # Dữ liệu: 6 loại cần, 16 loài cá, 2 map, điểm câu, nhiệm vụ ngày
 │   ├── audio.js    # Âm thanh WebAudio (bíp cắn câu, dính cá, bán cá...)
-│   ├── art.js      # Vẽ ao làng, cần, phao, cá bằng canvas vector
-│   └── game.js     # State machine: MENU→PREPARE→CAST→WAIT→BITE→STRIKE→FIGHT→RESULT→SHOP
+│   ├── art.js      # Vẽ ao làng + sông quê, cần, phao, cá bằng canvas vector
+│   └── game.js     # State machine: MENU→PREPARE→MAP→SPOT→CAST→WAIT→BITE→STRIKE→FIGHT→RESULT→SHOP
+├── docs/
+│   └── thiet-ke-mo-rong.md  # Tài liệu thiết kế mở rộng v2.0
 └── README.md
 ```
 
 ## Gameplay
 
+### MVP (ao làng)
 1. **Chuẩn bị:** chọn cần (tre → trúc → composite → carbon), chọn mồi.
    Giun đất miễn phí nhưng phải **đào tay** qua mini-game (20 giây).
 2. **Quăng cần:** chạm vào mặt nước. Cần xịn quăng xa hơn — chỗ xa có cá to.
@@ -52,8 +55,27 @@ game-cau-ca-2d/
    Căng quá đứt dây, lỏng quá tuột cá.
 6. **Bán cá** lấy tiền nâng cần. Tiến trình lưu tự động (localStorage).
 
-## 8 loài cá ao làng
+### Đợt 1 — Sông quê 🌊
+- **Chọn map** sau khi chuẩn bị: Ao làng (mặc định) / Sông quê
+  (mở khóa khi câu 15 con ở ao làng **hoặc** đạt cấp cần thủ 2).
+- **3 điểm câu** trên sông: Bến đò (dễ, dòng êm), Gầm cầu (vừa, hố sâu),
+  Bãi bồi (khó, dòng xiết). Mỗi điểm có cá đặc trưng riêng.
+- **Dòng chảy:** mồi nhẹ ở chỗ xiết bị trôi → tỉ lệ cắn giảm 40%.
+  Dùng cám (nặng hơn giun) hoặc đổi điểm câu.
+- **Thời tiết:** mỗi phiên 25% "vừa mưa xong" → cá ăn mạnh (+30%).
+- **Giờ vàng:** 5–7h sáng và 16–18h (giờ thật) → tỉ lệ cắn +25%.
+- **8 loài cá sông mới:** ngạnh, thác lác, basa, lăng, tra, cá he,
+  bống tượng, cá chốt — mỗi loài pattern cắn riêng.
+- **Cần máy (spinning):** 2.4m (6.000đ, cấp 2) và 3.0m bạo lực
+  (30.000đ, cấp 8). Dùng được ở cả ao và sông.
+- **Cấp cần thủ:** = floor(tổng cá đã câu / 10) + 1 (tối đa 15),
+  mở khóa map và cần mới.
+- **Nhiệm vụ ngày:** 3 nhiệm vụ ngẫu nhiên mỗi ngày (pool 9 loại),
+  làm xong nhận thưởng tiền/mồi.
 
+## 16 loài cá
+
+### Ao làng (8)
 | Cá | Cân nặng | Giá/kg | Độ khó bo |
 |---|---|---|---|
 | Rô phi | 0,2–0,8 kg | 30.000đ | ⭐ |
@@ -64,6 +86,18 @@ game-cau-ca-2d/
 | Cá chim | 0,5–2,0 kg | 55.000đ | ⭐⭐⭐ |
 | Cá trê | 0,4–3,0 kg | 70.000đ | ⭐⭐⭐ |
 | Tai tượng | 0,8–4,0 kg | 80.000đ | ⭐⭐⭐⭐ |
+
+### Sông quê (8, Đợt 1)
+| Cá | Cân nặng | Giá/kg | Mồi ưa thích | Độ khó bo |
+|---|---|---|---|---|
+| Cá ngạnh | 0,5–3,0 kg | 60.000đ | Giun | ⭐⭐⭐ |
+| Cá thác lác | 0,3–1,2 kg | 70.000đ | Giun | ⭐⭐ |
+| Cá basa | 1,0–6,0 kg | 40.000đ | Cám | ⭐⭐ |
+| Cá lăng | 1,0–8,0 kg | 65.000đ | Giun | ⭐⭐⭐⭐ |
+| Cá tra | 1,0–5,0 kg | 35.000đ | Cám | ⭐⭐ |
+| Cá he | 0,2–0,8 kg | 30.000đ | Cám | ⭐ |
+| Bống tượng | 0,2–1,0 kg | 75.000đ | Giun | ⭐⭐ |
+| Cá chốt | 0,1–0,5 kg | 25.000đ | Giun | ⭐ |
 
 ## Gắn link affiliate (cho admin)
 
@@ -80,8 +114,15 @@ trong hàm `renderShop()`, thay `<a href="#">` bằng URL affiliate
 
 ## Roadmap mở rộng (theo bản thiết kế 36 trang)
 
-- [ ] Mini-game cân phao, chọn điểm câu
-- [ ] Thêm map: sông, suối, hồ, đập thủy điện, cửa sông
+### Đợt 1 ✅ (đã xong)
+- [x] Map Sông quê: 3 điểm câu, dòng chảy, thời tiết, giờ vàng
+- [x] 8 loài cá sông mới (ngạnh, thác lác, basa, lăng, tra, cá he, bống tượng, cá chốt)
+- [x] Cần máy spinning (2.4m / 3.0m bạo lực)
+- [x] Cấp độ cần thủ + Nhiệm vụ ngày
+
+### Tiếp theo
+- [ ] Mini-game cân phao, chọn điểm câu (ao làng)
+- [ ] Thêm map: suối, hồ, đập thủy điện, cửa sông
 - [ ] Thêm kỹ thuật: câu lure, câu lục, câu iso
 - [ ] Chế độ "Trốn vợ đi câu" 😄
 - [ ] Công thức trộn mồi, thời tiết/giờ cắn câu

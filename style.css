@@ -194,6 +194,28 @@ html, body {
 .dig-cell.active { background: #a1887f; animation: pop .18s ease-out; }
 @keyframes pop { from { transform: scale(.8); } to { transform: scale(1); } }
 
+/* ---- Badge nhiệm vụ ---- */
+.badge {
+  display: inline-block; min-width: 24px; height: 24px; line-height: 24px;
+  background: var(--danger); color: #fff; border-radius: var(--r-pill);
+  font-size: var(--fs-caption); font-weight: bold; padding: 0 7px; vertical-align: middle;
+}
+
+/* ---- Thẻ map ---- */
+.map-card { text-align: center; cursor: pointer; }
+.map-card .map-icon { font-size: 44px; display: block; margin: 4px 0; }
+.map-card.locked { opacity: .65; cursor: not-allowed; background: #f5f0e6; }
+.map-card:not(.locked):hover { border-color: var(--brand-500); }
+.lock-line { color: var(--danger); font-size: var(--fs-small); font-weight: bold; margin-top: 6px; }
+
+/* ---- Thẻ nhiệm vụ ---- */
+.quest-card .qbar { height: 10px; background: #e0e0e0; border-radius: 5px; overflow: hidden; margin: 8px 0 4px; }
+.quest-card .qbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--sun-500), var(--gold)); border-radius: 5px; transition: width var(--t-med) ease; }
+.quest-card .qprog { font-size: var(--fs-caption); color: var(--ink-soft); }
+.quest-card .qreward { font-size: var(--fs-small); color: var(--gold); font-weight: bold; margin: 4px 0; }
+.quest-card.done { border-color: var(--sun-500); background: #fffdf4; }
+.quest-card.claimed { opacity: .6; }
+
 /* ---- Kết quả ---- */
 .res-name { font-size: var(--fs-title); font-weight: bold; color: #33691e; margin: 6px 0; }
 #res-fish { background: #e3f2fd; border-radius: 10px; margin: 6px 0; }
