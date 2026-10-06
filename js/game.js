@@ -85,7 +85,9 @@ function rod() { return RODS.find(r => r.id === S.rod) || RODS[0]; }
 function contDef() { return containerById(S.activeContainer); }
 function keptCount() { return (S.keptFish || []).length; }
 function keptValue() { return (S.keptFish || []).reduce((a, f) => a + (f.price || 0), 0); }
-function contFull() { return keptCount() >= contDef().cap; }
+// Tổng kg đang giữ + tỉ lệ tải (theo KG — luật mới). contFull cũ theo số con đã bỏ.
+function keptKg() { return (S.keptFish || []).reduce((a, f) => a + (f.weight || 0), 0); }
+function contLoad() { return contLoadKg(keptKg(), contDef().cap); }
 // Vị trí vẽ + vùng chạm của đồ đựng (khớp Art.drawContainer)
 function containerPos() {
   const c = contDef();
@@ -174,6 +176,7 @@ let spot = null;              // điểm câu sông quê đang chọn (object RI
 let session = { weather: 'nang', golden: false }; // thời tiết & giờ vàng của phiên câu
 let trip = null;              // Đợt 2: chuyến "trốn vợ" — {gameMin, deadline, elapsed, callAt, willCall, called, resumePhase}
 let homeConfirmT = 0;         // đếm ngược xác nhận "về nhà" khi quá giờ
+let riskT = 0, overWarned = false, contShakeT = 0; // rủi ro đồ đựng: roll định kỳ, cảnh báo quá tải, rung rọ
 let lastClockMin = -1;        // phút game đã hiển thị trên HUD (tránh ghi DOM mỗi frame)
 
 /* ---------- DOM helper ---------- */
@@ -231,7 +234,10 @@ function updateHUD() {
   const hc = $('hud-container');
   const showCont = S.mode === 'wife' && (trip || isFishing());
   hc.classList.toggle('hidden', !showCont);
-  if (showCont) hc.textContent = contDef().icon + ' ' + keptCount() + '/' + contDef().cap;
+  if (showCont) {
+    hc.textContent = contDef().icon + ' ' + keptKg().toFixed(1) + '/' + contDef().cap + 'kg';
+    hc.classList.toggle('hot', contLoad() > 1);
+  }
   $('menu-money').textContent = fmt(S.money);
   $('menu-level').textContent = 'Cấp ' + level();
   // Dòng trạng thái vợ con trên menu
@@ -271,6 +277,7 @@ function startWifeTrip() {
     callAt: rnd(120, 360), resumePhase: null,
   };
   S.keptFish = []; // đầu chuyến: đồ đựng trống
+  riskT = 0; overWarned = false; contShakeT = 0;
   if (!S.containers.includes(S.activeContainer)) S.activeContainer = S.containers[S.containers.length - 1];
   S.weekEntries[todayStr()] = true;
   save();
@@ -783,11 +790,65 @@ function fightWin() {
 }
 // Cập nhật nút "Cho vào đồ đựng" theo sức chứa còn lại
 function renderWifeResult() {
-  const c = contDef(), n = keptCount(), full = n >= c.cap;
+  // Luật sức chứa theo KG: thùng đầy cứng (disable), rọ/xô cho nhồi quá tải kèm rủi ro
+  const c = contDef(), kg = keptKg(), load = contLoad();
   const btn = $('btn-wife-keep');
-  btn.textContent = c.icon + ' Cho vào ' + c.name + ' (' + n + '/' + c.cap + ')';
-  btn.disabled = full;
-  if (full) toast('🪣 Đầy ắp rồi, về nhà thôi!');
+  btn.textContent = c.icon + ' Cho vào ' + c.name + ' (' + kg.toFixed(1) + '/' + c.cap + 'kg)';
+  btn.classList.remove('danger');
+  if (c.id === 'thung') {
+    const over = kg + lastWeight > c.cap + 1e-9;
+    btn.disabled = over;
+    if (over) toast('🛢️ Thùng đã đầy — không nhét thêm được!');
+  } else {
+    btn.disabled = false;
+    if (load > 1) {
+      btn.classList.add('danger');
+      btn.textContent += ' ⚠️';
+    }
+  }
+}
+// --- Rủi ro quá tải đồ đựng (mode Trốn vợ) ---
+// Roll MỖI LẦN cho cá vào khi đã vượt tải; cộng roll nhẹ mỗi 30s lúc WAIT (contRiskIdle).
+function contRiskOnKeep(c) {
+  const load = contLoad();
+  if (load <= 1) return;
+  if (!overWarned) {
+    overWarned = true;
+    toast(c.id === 'ro' ? '⚠️ Rọ đã quá tải! Nhồi thêm có thể VỠ TOANG, xổng hết cá...'
+                        : '⚠️ Xô đã quá tải! Cá khỏe có thể nhảy ra ngoài...');
+    Sfx.fail();
+  }
+  if (c.id === 'ro') {
+    if (Math.random() < roBreakChance(load)) breakBasket();
+  } else if (c.id === 'xo') {
+    if (contRiskLevel('xo', load) === 'jump-many') jumpOut(Math.min(S.keptFish.length, 2 + (Math.random() < 0.5 ? 1 : 0)), true);
+    else if (Math.random() < xoJumpChance(load)) jumpOut(1, false);
+  }
+}
+function contRiskIdle() {
+  const c = contDef(), load = contLoad();
+  if (load <= 1 || c.id === 'thung') return;
+  if (Math.random() >= contIdleChance(c.id, load)) return;
+  if (c.id === 'ro') breakBasket();
+  else jumpOut(1, false);
+}
+function breakBasket() {
+  const n = keptCount();
+  S.keptFish = []; contShakeT = 1.2; save(); updateHUD();
+  toast('💥 Rọ vỡ toang! ' + n + ' con cá xổng hết rồi...');
+  Sfx.fail();
+}
+function jumpOut(n, certain) {
+  const picks = pickJumpers(S.keptFish || [], n);
+  if (!picks.length) return;
+  const idx = {};
+  picks.forEach(p => { idx[p.i] = 1; });
+  const gone = picks.map(p => p.f);
+  S.keptFish = (S.keptFish || []).filter((f, i) => !idx[i]);
+  save(); updateHUD();
+  toast('🐟 ' + (certain ? 'Xô chật quá! ' : '') +
+    gone.map(f => f.name + ' ' + f.weight.toFixed(2) + 'kg').join(', ') + ' nhảy ra khỏi xô!');
+  if (Sfx.splash) Sfx.splash();
 }
 function showFunny(text) {
   const f = $('res-funny');
@@ -856,8 +917,8 @@ function renderWifeHome() {
     : '<span class="subtitle">Chưa có danh hiệu — cố lên!</span>';
   const b = S.keptFish || [];
   const cap = contDef().cap;
-  $('wh-kept-n').textContent = b.length;
-  $('wh-kept-cap').textContent = cap;
+  $('wh-kept-n').textContent = keptKg().toFixed(1);
+  $('wh-kept-cap').textContent = cap + ' kg';
   $('wh-kept').innerHTML = b.length
     ? b.map(f => '<div class="card"><div class="card-title">🐟 ' + f.name + '</div>' +
       '<div class="card-desc">' + f.weight.toFixed(2) + ' kg — trị giá ' + fmt(f.price) + '</div></div>').join('')
@@ -968,10 +1029,24 @@ function enterKitchen() {
 /* ---------- Đồ đựng cá: popup xem + chạm trong scene ---------- */
 // Popup xem cá đang giữ — chạm vào xô/rọ/thùng trong scene (mode Trốn vợ)
 function enterContainer() {
-  const c = contDef(), b = S.keptFish || [];
+  const c = contDef(), b = S.keptFish || [], kg = keptKg(), load = contLoad();
+  const pct = Math.min(100, Math.round(load * 100));
   $('cont-title').textContent = c.icon + ' ' + c.name;
-  $('cont-sub').textContent = 'Đang giữ ' + b.length + '/' + c.cap + ' con' +
+  $('cont-sub').textContent = 'Đang giữ ' + kg.toFixed(1) + '/' + c.cap + ' kg' +
+    (load > 1 ? ' ⚠️ QUÁ TẢI!' : '') +
     (c.place === 'water' ? ' — rọ ngập dưới nước, cá sống khỏe 🐟' : ' — để trên bờ');
+  const fill = $('cont-fill');
+  if (fill) {
+    fill.style.width = pct + '%';
+    fill.classList.toggle('over', load > 1);
+  }
+  const warn = $('cont-warn');
+  if (warn) {
+    warn.classList.toggle('hidden', load <= 1);
+    if (load > 1) warn.textContent = c.id === 'ro'
+      ? '⚠️ Rọ quá tải — nhồi thêm có thể VỠ, xổng hết cá!'
+      : '⚠️ Xô quá tải — cá khỏe có thể nhảy ra ngoài!';
+  }
   $('cont-list').innerHTML = b.length
     ? b.map(f => '<div class="kept-row"><span class="kept-ico">🐟</span>' +
       '<span class="kept-who"><b>' + escHtml(f.name) + '</b>' +
@@ -1111,13 +1186,21 @@ bindClick('btn-sell', () => {
   afterAttempt();
 });
 // Mode Trốn vợ: cho cá vào đồ đựng (KHÔNG bán ngay ở bờ — về nhà mới Bán/Dâng/Nấu)
-bindClick('btn-wife-keep', () => {
-  if (contFull()) { toast('🪣 Đầy ắp rồi, về nhà thôi!'); Sfx.fail(); return; }
+// Cho cá vào đồ đựng (dùng chung cho nút UI và test)
+function keepFishToContainer() {
+  // Thùng: tải cứng — không nhồi thêm. Rọ/Xô: cho nhồi quá tải nhưng roll rủi ro.
+  const c = contDef();
+  if (c.id === 'thung' && keptKg() + lastWeight > c.cap + 1e-9) {
+    toast('🛢️ Thùng đã đầy — không nhét thêm được!'); Sfx.fail(); return false;
+  }
   S.keptFish.push({ fishId: fish.id, name: fish.name, weight: lastWeight, price: lastPrice });
   save();
   updateHUD();
-  showFunny(funny(FUNNY_KEEP, { cont: contDef().name }));
-});
+  showFunny(funny(FUNNY_KEEP, { cont: c.name }));
+  contRiskOnKeep(c);
+  return true;
+}
+bindClick('btn-wife-keep', keepFishToContainer);
 bindClick('btn-wife-release', () => {
   S.merit = (S.merit || 0) + 1;
   S.totalMerit = (S.totalMerit || 0) + 1;
@@ -1263,9 +1346,15 @@ function update(dt) {
     }
   }
   if (homeConfirmT > 0) { homeConfirmT -= dt; if (homeConfirmT <= 0) updateHUD(); }
+  if (contShakeT > 0) contShakeT -= dt;
   if (phase === 'WAIT') {
     waitT -= dt;
     if (waitT <= 0) startBite();
+    // Quá tải mà cứ ngâm cần: mỗi 30s roll rủi ro một lần (nhẹ hơn lúc nhồi cá)
+    if (S.mode === 'wife' && trip) {
+      riskT += dt;
+      if (riskT >= 30) { riskT = 0; contRiskIdle(); }
+    }
   } else if (phase === 'BITE') {
     biteT += dt;
     if (biteT >= 1.2) startStrike();
@@ -1403,7 +1492,8 @@ function render() {
     container: (function () {
       if (S.mode !== 'wife' || !isFishing()) return null;
       const cp = containerPos();
-      return { id: S.activeContainer, x: cp.x, y: cp.y };
+      const shx = contShakeT > 0 ? Math.sin(tG * 40) * 7 * contShakeT : 0;
+      return { id: S.activeContainer, x: cp.x + shx, y: cp.y };
     })(),
     float: showFloat ? { x: fx, y: fy, show: true, dy: fdy, tilt } : { show: false },
     rodBend, splashes, biteFlash,
@@ -1568,9 +1658,15 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     selectSpot(i) { spot = RIVER_SPOTS[i]; },
     // Đồ đựng cá (test)
     cont() { return { containers: S.containers.slice(), active: S.activeContainer, kept: S.keptFish.slice(), cap: contDef().cap }; },
+    contKg() { return keptKg(); }, contLoad() { return contLoad(); },
     setKept(arr) { S.keptFish = arr; save(); },
     sellKeptNow() { sellKept(); },
     openContainer() { enterContainer(); },
+    keepTest(fishId, weight, price) { // test: giả lập câu được 1 con rồi cho vào đồ đựng
+      const f = FISH.find(x => x.id === fishId) || FISH[0];
+      fish = f; lastWeight = weight; lastPrice = (price == null ? Math.round(f.price * weight) : price);
+      return keepFishToContainer();
+    },
   };
 }
 
