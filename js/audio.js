@@ -49,6 +49,186 @@ const Sfx = {
   splash() { this.tone(300, 0.12, 'sine', 0.10); this.tone(180, 0.15, 'sine', 0.08, 0.06); },
   // Cuốc bổ xuống đất: "cụp" trầm
   dig()    { this.tone(140, 0.09, 'triangle', 0.14); this.tone(85, 0.13, 'sine', 0.12, 0.05); },
+
+  /* ===== Trụ cột 1: SFX môi trường & hành động (Web Audio thuần) ===== */
+  _noiseBuf: null,
+  _noiseBufCtx() { // buffer noise dùng chung, tạo lười
+    if (!this.ctx) return null;
+    if (!this._noiseBuf) {
+      const len = 2 * this.ctx.sampleRate;
+      const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      this._noiseBuf = buf;
+    }
+    return this._noiseBuf;
+  },
+  // Nốt có lọc EQ (tách dải cho ambient không át nhạc)
+  _fTone(freq, dur, type, vol, delay, fType, fFreq) {
+    if (this.muted || !this.ctx) return;
+    delay = delay || 0;
+    const t0 = this.ctx.currentTime + delay;
+    const o = this.ctx.createOscillator();
+    const flt = this.ctx.createBiquadFilter();
+    const g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t0);
+    flt.type = fType; flt.frequency.value = fFreq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(flt); flt.connect(g); g.connect(this.ctx.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  },
+
+  // "Bõm" khi mồi chạm nước / cá quẫy: noise burst lọc thấp + sine rơi tần số
+  // Công thức: noise 0.18s qua lowpass 900Hz (vol 0.22) + sine 520→170Hz/0.16s (vol 0.16)
+  waterPlip() {
+    if (this.muted || !this.ctx) return;
+    const t0 = this.ctx.currentTime, buf = this._noiseBufCtx();
+    if (buf) {
+      const src = this.ctx.createBufferSource(); src.buffer = buf;
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.22, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.18);
+      src.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
+      src.start(t0); src.stop(t0 + 0.2);
+    }
+    const o = this.ctx.createOscillator(), g2 = this.ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(520, t0);
+    o.frequency.exponentialRampToValueAtTime(170, t0 + 0.16);
+    g2.gain.setValueAtTime(0.16, t0);
+    g2.gain.exponentialRampToValueAtTime(0.001, t0 + 0.16);
+    o.connect(g2); g2.connect(this.ctx.destination);
+    o.start(t0); o.stop(t0 + 0.2);
+  },
+
+  // --- Tiếng dế: chùm chirp 4200Hz ngắt quãng, loop nhẹ lúc đêm/chập tối ---
+  _cricketTimer: null,
+  _chirpTrain() {
+    for (let i = 0; i < 5; i++) this._fTone(4200, 0.045, 'sine', 0.030, i * 0.075, 'highpass', 3000);
+  },
+  crickets(on) {
+    if (on && !this._cricketTimer && !this.muted && this.ctx) {
+      this._chirpTrain();
+      this._cricketTimer = setInterval(() => this._chirpTrain(), 2600);
+    } else if (!on && this._cricketTimer) {
+      clearInterval(this._cricketTimer); this._cricketTimer = null;
+    }
+  },
+  // --- Tiếng ếch: croak trầm 180-250Hz có rung (tremolo 28Hz), gần mặt nước lúc đêm ---
+  _frogTimer: null,
+  _croak(f0) {
+    if (this.muted || !this.ctx) return;
+    const t0 = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f0;
+    const lfo = this.ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 28;
+    const lg = this.ctx.createGain(); lg.gain.value = 42;
+    lfo.connect(lg); lg.connect(o.frequency);
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 480;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.055, t0 + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+    o.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
+    o.start(t0); o.stop(t0 + 0.55); lfo.start(t0); lfo.stop(t0 + 0.55);
+  },
+  frogs(on) {
+    if (on && !this._frogTimer && !this.muted && this.ctx) {
+      this._croak(200);
+      this._frogTimer = setInterval(() => {
+        this._croak(180 + Math.random() * 70);
+        if (Math.random() < 0.5) setTimeout(() => this._croak(160 + Math.random() * 50), 380);
+      }, 3800);
+    } else if (!on && this._frogTimer) {
+      clearInterval(this._frogTimer); this._frogTimer = null;
+    }
+  },
+  // --- Mưa rơi lách tách rất nhẹ (chỉ khi weather='mua') ---
+  _rainNodes: null,
+  rainPat(on) {
+    if (on && !this._rainNodes && !this.muted && this.ctx) {
+      const buf = this._noiseBufCtx(); if (!buf) return;
+      const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2800;
+      const g = this.ctx.createGain(); g.gain.value = 0.014;
+      src.connect(lp); lp.connect(g); g.connect(this.ctx.destination);
+      src.start();
+      this._rainNodes = [src];
+    } else if (!on && this._rainNodes) {
+      try { this._rainNodes.forEach(n => n.stop()); } catch (e) {}
+      this._rainNodes = null;
+    }
+  },
+
+  // --- Máy câu rít khi bo: sawtooth, f = 700 + tension*1300 Hz, gain theo tension ---
+  // Công thức: freq = 700 + tension×1300 (700..2000Hz); gain = 0.02 + tension×0.085
+  _reel: null,
+  reelStart() {
+    if (this.muted || !this.ctx || this._reel) return;
+    try {
+      const o = this.ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 700;
+      const g = this.ctx.createGain(); g.gain.value = 0.0001;
+      o.connect(g); g.connect(this.ctx.destination); o.start();
+      this._reel = { o, g };
+    } catch (e) { this._reel = null; }
+  },
+  reelUpdate(tension) {
+    if (!this._reel || !this.ctx) return;
+    const t = this.ctx.currentTime, r = this._reel;
+    r.o.frequency.setTargetAtTime(700 + tension * 1300, t, 0.05);
+    r.g.gain.setTargetAtTime(tension <= 0.01 ? 0.0001 : 0.02 + tension * 0.085, t, 0.05);
+  },
+  reelStop() {
+    if (!this._reel || !this.ctx) { this._reel = null; return; }
+    try {
+      const r = this._reel, t = this.ctx.currentTime;
+      r.g.gain.setTargetAtTime(0.0001, t, 0.06);
+      r.o.stop(t + 0.25);
+    } catch (e) {}
+    this._reel = null;
+  },
+
+  // --- Chuông "Vợ gọi" dồn dập: two-tone 440/480Hz, double-ring, loop tới khi nghe/hết giờ ---
+  _phoneTimer: null,
+  phoneRing() {
+    if (this._phoneTimer || this.muted || !this.ctx) return;
+    const pattern = () => {
+      if (this.muted) return;
+      this.tone(440, 0.22, 'square', 0.09, 0);
+      this.tone(480, 0.22, 'square', 0.09, 0.28);
+      this.tone(440, 0.22, 'square', 0.09, 0.56);
+      this.tone(480, 0.22, 'square', 0.09, 0.84);
+    };
+    pattern();
+    this._phoneTimer = setInterval(pattern, 2100);
+  },
+  phoneStop() {
+    if (this._phoneTimer) { clearInterval(this._phoneTimer); this._phoneTimer = null; }
+  },
+
+  // --- Ambient manager: pha trộn theo mood + map, gain thấp, không át nhạc ---
+  _ambKey: '',
+  setAmbient(mood, map) {
+    const m = (mood && mood.mood) || 'day', wet = !!(mood && mood.wet);
+    const key = m + '|' + (wet ? 1 : 0) + '|' + (this.muted ? 1 : 0);
+    if (key === this._ambKey) return;
+    this._ambKey = key;
+    const night = m === 'night', dusk = m === 'dusk';
+    this.crickets(night || dusk);
+    this.frogs(night);            // ếch chỉ lúc đêm, gần mặt nước
+    this.rainPat(wet);
+  },
+  stopAmbient() {
+    this.crickets(false); this.frogs(false); this.rainPat(false);
+    this._ambKey = '';
+  },
+  // Nút loa: dừng mọi loop khi tắt tiếng
+  applyMute() {
+    if (this.muted) { this.stopAmbient(); this.reelStop(); this.phoneStop(); }
+    else this._ambKey = ''; // bật lại: cho phép setAmbient chạy lại ở vòng loop tới
+  },
 };
 
 /* ===== Nhạc nền: Web Audio thuần, giai điệu ngũ cung gợi quê Việt Nam =====
