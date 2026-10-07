@@ -249,18 +249,18 @@ const TRICK_QS = [
 
 // Quà tặng vợ trong shop "Quà cho vợ"
 const WIFE_GIFTS = [
-  { id: 'tra-sua', icon: '🧋', name: 'Trà sữa',   price: 6000,  happy: 10, desc: 'Vợ cười tít mắt! Hạnh phúc +10 😍' },
-  { id: 'hoa',     icon: '💐', name: 'Bó hoa',     price: 10000, happy: 15, desc: 'Hoa đẹp như vợ! Hạnh phúc +15 🌸' },
-  { id: 'son',     icon: '💄', name: 'Son môi',    price: 16000, happy: 20, desc: 'Vợ thoa son đi chơi với bạn! Hạnh phúc +20 💃' },
-  { id: 'tui',     icon: '👜', name: 'Túi xách',   price: 40000, happy: 30, desc: 'Vợ ôm túi cười cả ngày! Hạnh phúc +30 🥰' },
+  { id: 'tra-sua', icon: '🧋', name: 'Trà sữa',   price: 30000,  happy: 10, desc: 'Vợ cười tít mắt! Hạnh phúc +10 😍' },
+  { id: 'hoa',     icon: '💐', name: 'Bó hoa',     price: 50000, happy: 15, desc: 'Hoa đẹp như vợ! Hạnh phúc +15 🌸' },
+  { id: 'son',     icon: '💄', name: 'Son môi',    price: 80000, happy: 20, desc: 'Vợ thoa son đi chơi với bạn! Hạnh phúc +20 💃' },
+  { id: 'tui',     icon: '👜', name: 'Túi xách',   price: 200000, happy: 30, desc: 'Vợ ôm túi cười cả ngày! Hạnh phúc +30 🥰' },
 ];
 
 // Quà chuộc lỗi khi bị cấm câu (trừ nghi ngờ — nghi ngờ < 80 là được gỡ cấm ngay)
 const BRIBE_GIFTS = [
-  { id: 'tra-sua', icon: '🧋', name: 'Trà sữa',   price: 6000,  down: 3,  happy: 2, desc: 'Vợ bớt giận chút xíu! Nghi ngờ -3 😌' },
-  { id: 'hoa',     icon: '💐', name: 'Bó hoa',     price: 10000, down: 6,  happy: 3, desc: 'Vợ mỉm cười! Nghi ngờ -6 🌸' },
-  { id: 'son',     icon: '💄', name: 'Son môi',    price: 16000, down: 10, happy: 4, desc: 'Vợ hết giận kha khá! Nghi ngờ -10 💄' },
-  { id: 'tui',     icon: '👜', name: 'Túi xách',   price: 40000, down: 25, happy: 8, desc: 'Vợ nguôi giận hẳn! Nghi ngờ -25 😍' },
+  { id: 'tra-sua', icon: '🧋', name: 'Trà sữa',   price: 30000,  down: 3,  happy: 2, desc: 'Vợ bớt giận chút xíu! Nghi ngờ -3 😌' },
+  { id: 'hoa',     icon: '💐', name: 'Bó hoa',     price: 50000, down: 6,  happy: 3, desc: 'Vợ mỉm cười! Nghi ngờ -6 🌸' },
+  { id: 'son',     icon: '💄', name: 'Son môi',    price: 80000, down: 10, happy: 4, desc: 'Vợ hết giận kha khá! Nghi ngờ -10 💄' },
+  { id: 'tui',     icon: '👜', name: 'Túi xách',   price: 200000, down: 25, happy: 8, desc: 'Vợ nguôi giận hẳn! Nghi ngờ -25 😍' },
 ];
 
 // Nguyên liệu đúng cho mini-game "Vào bếp" (30s)
