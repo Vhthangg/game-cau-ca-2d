@@ -569,20 +569,15 @@ const Art = (function () {
     // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
     if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y, v.container.load);
     else drawDecoBucket(ctx, 690, 492);
+    // cần thủ đứng trên bờ ao
+    if (v.angler) drawAnglerLand(ctx, v.angler.x, v.angler.y);
 
     dimForMood(ctx, W, H, sky);
     drawOverlay(ctx, t, v);
   }
 
-  // --- Sông quê: mặt sông rộng, dòng chảy, cầu, 3 điểm câu ---
-  function drawRiverScene(ctx, t, v) {
-    const W = 960, H = 540;
-
-    const sky = v.sky || { mood: 'day', wet: false };
-    drawSky(ctx, W, 190, t, sky);
-
-    drawFarBank(ctx, W, 185, t, sky);
-    // mặt cầu
+  // --- Sông quê: mỗi điểm câu có layout riêng, cần thủ đứng đúng điểm đã chọn ---
+  function drawBridge(ctx) {
     ctx.fillStyle = '#9e9e9e'; ctx.fillRect(380, 138, 200, 24);
     ctx.fillStyle = '#757575'; ctx.fillRect(380, 138, 200, 6);
     ctx.fillStyle = '#8d8d8d';
@@ -593,16 +588,36 @@ const Art = (function () {
       ctx.beginPath(); ctx.moveTo(x, 138); ctx.lineTo(x, 122); ctx.stroke();
     }
     ctx.beginPath(); ctx.moveTo(380, 122); ctx.lineTo(580, 122); ctx.stroke();
-
+  }
+  function drawRiverScene(ctx, t, v) {
+    const W = 960, H = 540;
+    const sky = v.sky || { mood: 'day', wet: false };
+    const decor = (v.spotLayout && v.spotLayout.decor) || 'overview';
+    drawSky(ctx, W, 190, t, sky);
+    drawFarBank(ctx, W, 185, t, sky);
+    if (decor === 'gamcau' || decor === 'overview') drawBridge(ctx);
     drawWater(ctx, 0, 185, W, 270, t, sky, { rows: 7, river: true });
-
-    // --- Bờ gần: cỏ (trái) + bãi cát bồi (phải) ---
-    ctx.fillStyle = '#7a9a4e'; ctx.fillRect(0, 452, 560, 88);
-    ctx.fillStyle = '#d9c08a'; ctx.fillRect(560, 452, 400, 88);
-    ctx.fillStyle = '#6b8a42'; ctx.fillRect(0, 452, 560, 8);
-    ctx.fillStyle = '#c4a76f'; ctx.fillRect(560, 452, 400, 8);
-    grassTufts.forEach(g => {
-      if (g.x > 560) return;
+    // --- Bờ gần theo điểm câu ---
+    if (decor === 'baiboi') {
+      ctx.fillStyle = '#d9c08a'; ctx.fillRect(0, 452, W, 88);      // bãi cát bồi
+      ctx.fillStyle = '#c4a76f'; ctx.fillRect(0, 452, W, 8);
+      drawReeds(ctx, t);
+    } else if (decor === 'bendo') {
+      ctx.fillStyle = '#9c7b54'; ctx.fillRect(0, 452, W, 88);      // bờ đất bến đò
+      ctx.fillStyle = '#7d5f3e'; ctx.fillRect(0, 452, W, 8);
+      drawWharf(ctx, t);                                          // cọc gỗ + thuyền nan
+    } else if (decor === 'gamcau') {
+      ctx.fillStyle = '#8a8a7a'; ctx.fillRect(0, 452, W, 88);      // bờ bê tông gầm cầu
+      ctx.fillStyle = '#6f6f62'; ctx.fillRect(0, 452, W, 8);
+      ctx.fillStyle = 'rgba(30,30,45,.22)'; ctx.fillRect(380, 185, 200, 270); // bóng râm gầm cầu
+    } else {
+      ctx.fillStyle = '#7a9a4e'; ctx.fillRect(0, 452, 560, 88);
+      ctx.fillStyle = '#d9c08a'; ctx.fillRect(560, 452, 400, 88);
+      ctx.fillStyle = '#6b8a42'; ctx.fillRect(0, 452, 560, 8);
+      ctx.fillStyle = '#c4a76f'; ctx.fillRect(560, 452, 400, 8);
+    }
+    if (decor !== 'baiboi') grassTufts.forEach(g => {
+      if (decor === 'overview' && g.x > 560) return;
       ctx.strokeStyle = '#5d8f46'; ctx.lineWidth = 2;
       for (let k = -1; k <= 1; k++) {
         ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.quadraticCurveTo(g.x + k * 4, g.y - 8, g.x + k * 7, g.y - 12); ctx.stroke();
@@ -611,15 +626,15 @@ const Art = (function () {
     // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
     if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y, v.container.load);
     else drawDecoBucket(ctx, 690, 492);
-
-    // --- Điểm câu (phase chọn điểm) ---
+    // --- Cần thủ đứng đúng điểm đã chọn ---
+    if (v.angler && decor !== 'overview') drawAnglerLand(ctx, v.angler.x, v.angler.y);
+    // --- Điểm câu (phase chọn điểm): tên + mô tả + gợi ý cá ---
     (v.spots || []).forEach(s => {
       const pr = (t * 1.6) % 1;
       ctx.strokeStyle = 'rgba(255,235,59,' + (1 - pr * 0.7) + ')'; ctx.lineWidth = 4;
       ctx.beginPath(); ctx.arc(s.x, s.y, 30 + pr * 14, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = 'rgba(20,35,28,.75)';
       ctx.beginPath(); ctx.arc(s.x, s.y, 26, 0, Math.PI * 2); ctx.fill();
-      // số gợn sóng = độ xiết dòng
       ctx.strokeStyle = '#4dd0e1'; ctx.lineWidth = 3;
       const n = 1 + Math.round(s.flow * 2);
       for (let i = 0; i < n; i++) {
@@ -627,6 +642,15 @@ const Art = (function () {
         ctx.beginPath(); ctx.arc(s.x, wy, 7, 0.3, Math.PI - 0.3); ctx.stroke();
       }
       pill(ctx, s.name, s.x, s.y - 54);
+      // mô tả + gợi ý cá
+      ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const l1 = s.desc || '', l2 = '🎯 ' + (s.fish || '');
+      const w1 = ctx.measureText(l1).width, w2 = ctx.measureText(l2).width;
+      const bw = Math.max(w1, w2) + 24;
+      ctx.fillStyle = 'rgba(20,35,28,.78)';
+      rr(ctx, s.x - bw / 2, s.y + 34, bw, 44, 10); ctx.fill();
+      ctx.fillStyle = '#ffe9b8'; ctx.fillText(l1, s.x, s.y + 48);
+      ctx.fillStyle = '#a5d6a7'; ctx.fillText(l2, s.x, s.y + 66);
     });
     if (v.spotHint) pill(ctx, v.spotHint, 480, 60);
 
@@ -679,6 +703,46 @@ const Art = (function () {
     ctx.beginPath(); ctx.moveTo(x + 20, y - 113); ctx.quadraticCurveTo(x + 24, y - 100, x + 12, y - 96); ctx.stroke();
   }
 
+  // Can thu ti le nho cho landscape (0.72) — portrait giu nguyen
+  function drawAnglerLand(ctx, x, y) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(0.72, 0.72); ctx.translate(-x, -y);
+    drawAngler(ctx, x, y); ctx.restore();
+  }
+  // Coc go ben do + thuyen nan
+  function drawWharf(ctx, t) {
+    ctx.fillStyle = '#6d4c41';
+    for (const px of [90, 150, 210]) {
+      ctx.fillRect(px - 7, 400, 14, 100);
+      ctx.fillStyle = '#5d4037'; ctx.fillRect(px - 7, 400, 14, 10); ctx.fillStyle = '#6d4c41';
+    }
+    ctx.fillStyle = '#8d6e63'; ctx.fillRect(70, 430, 170, 14);
+    // thuyen nan troi nhe
+    const bx = 300 + Math.sin(t * 0.7) * 6, by = 445 + Math.sin(t * 1.1) * 3;
+    ctx.fillStyle = '#a1887f';
+    ctx.beginPath(); ctx.ellipse(bx, by, 46, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8d6e63';
+    ctx.beginPath(); ctx.ellipse(bx, by - 3, 34, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#6d4c41'; ctx.lineWidth = 2;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath(); ctx.moveTo(bx + i * 12, by - 10); ctx.lineTo(bx + i * 14, by + 4); ctx.stroke();
+    }
+  }
+  // Lau say bai boi
+  function drawReeds(ctx, t) {
+    for (const rx of [620, 700, 790, 870]) {
+      for (let k = 0; k < 5; k++) {
+        const sw = Math.sin(t * 1.2 + rx + k) * 4;
+        ctx.strokeStyle = k % 2 ? '#7a9a4e' : '#5d8f46'; ctx.lineWidth = 3;
+        const h = 46 + (k * 13) % 30;
+        ctx.beginPath(); ctx.moveTo(rx + k * 7 - 14, 470); ctx.quadraticCurveTo(rx + k * 7 - 14 + sw, 470 - h / 2, rx + k * 7 - 14 + sw * 1.6, 470 - h); ctx.stroke();
+        if (k % 3 === 0) {
+          ctx.fillStyle = '#8d6e63';
+          ctx.beginPath(); ctx.ellipse(rx + k * 7 - 14 + sw * 1.6, 470 - h - 6, 4, 9, 0.1, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+  }
+
   // --- Scene dọc portrait (W=540, H=960): bờ + cần thủ trên, mặt nước lớn ở giữa ---
   function drawPortraitScene(ctx, t, v, W, H) {
     const river = v.map === 'song';
@@ -690,7 +754,8 @@ const Art = (function () {
     drawFarBank(ctx, W, 190, t, sky);
     ctx.fillStyle = '#8a6f4d'; ctx.fillRect(0, 184, W, 13);
 
-    if (river) {
+    const pdecor = (v.spotLayout && v.spotLayout.decor) || 'overview';
+    if (river && (pdecor === 'gamcau' || pdecor === 'overview')) {
       // cầu bê tông bắc ngang mặt nước
       ctx.fillStyle = '#9e9e9e'; ctx.fillRect(170, 196, 200, 22);
       ctx.fillStyle = '#757575'; ctx.fillRect(170, 196, 200, 6);
@@ -702,6 +767,15 @@ const Art = (function () {
         ctx.beginPath(); ctx.moveTo(x, 196); ctx.lineTo(x, 182); ctx.stroke();
       }
       ctx.beginPath(); ctx.moveTo(170, 182); ctx.lineTo(370, 182); ctx.stroke();
+    }
+    if (river && pdecor === 'bendo') {
+      // cọc gỗ bến đò (bản portrait)
+      ctx.fillStyle = '#6d4c41';
+      for (const px of [70, 120, 170]) { ctx.fillRect(px - 6, 640, 12, 90); }
+      ctx.fillStyle = '#8d6e63'; ctx.fillRect(50, 660, 150, 12);
+      const bx = 400 + Math.sin(t * 0.7) * 5;
+      ctx.fillStyle = '#a1887f';
+      ctx.beginPath(); ctx.ellipse(bx, 690, 40, 11, 0, 0, Math.PI * 2); ctx.fill();
     }
 
     drawWater(ctx, 0, wtop, W, wbot - wtop, t, sky, { rows: 9, river: river });
@@ -743,6 +817,13 @@ const Art = (function () {
         ctx.beginPath(); ctx.arc(s.x, wy, 8, 0.3, Math.PI - 0.3); ctx.stroke();
       }
       pill(ctx, s.name, s.x, s.y - 74);
+      ctx.font = '12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const l1 = s.desc || '', l2 = '🎯 ' + (s.fish || '');
+      const bw = Math.max(ctx.measureText(l1).width, ctx.measureText(l2).width) + 20;
+      ctx.fillStyle = 'rgba(20,35,28,.78)';
+      rr(ctx, s.x - bw / 2, s.y + 40, bw, 40, 9); ctx.fill();
+      ctx.fillStyle = '#ffe9b8'; ctx.fillText(l1, s.x, s.y + 52);
+      ctx.fillStyle = '#a5d6a7'; ctx.fillText(l2, s.x, s.y + 68);
     });
     if (v.spotHint) pill(ctx, v.spotHint, W / 2, 120);
 
@@ -755,7 +836,7 @@ const Art = (function () {
         ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.quadraticCurveTo(g.x + k * 4, g.y - 8, g.x + k * 7, g.y - 12); ctx.stroke();
       }
     });
-    drawAngler(ctx, 150, 915);
+    if (v.angler) drawAngler(ctx, v.angler.x, v.angler.y); else drawAngler(ctx, 150, 915);
     // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
     if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y, v.container.load);
     else drawDecoBucket(ctx, 420, 868);
@@ -780,7 +861,8 @@ const Art = (function () {
     // --- Can cau + day + phao ---
     const f = v.float;
     if (f && f.show) {
-      const bx = P ? 190 : 150, by = P ? 815 : 528; // goc can (portrait: tay can thu)
+      const bx = (v.rodBase && v.rodBase.x) || (P ? 190 : 150);
+      const by = (v.rodBase && v.rodBase.y) || (P ? 815 : 528); // goc can = tay can thu
       // dau can cong theo luc bo
       const bend = v.rodBend || 0;
       const tx = bx + (f.x - bx) * 0.78;
