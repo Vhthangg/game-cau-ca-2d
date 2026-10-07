@@ -65,8 +65,10 @@ function defaultSave() {
            // Hệ thống đồ đựng cá (mode Trốn vợ): câu ở bờ KHÔNG bán ngay,
            // chỉ "Cho vào đồ đựng" — về nhà mới Bán/Dâng/Nấu. (Tự do giữ nguyên.)
            containers: ['xo'], activeContainer: 'xo', keptFish: [],
-           // Thanh thể lực: tốn khi quăng/đào/bo/nấu; hết (=0) thì về nhà nghỉ
-           stamina: 100, staminaTs: 0, restDay: null };
+           // Thanh thể lực: tốn khi quăng/đào/bo/nấu; hết (=0) thì ăn đồ hoặc chờ hồi
+           stamina: 100, staminaTs: 0,
+           // Kho đồ ăn hồi thể lực: S.food = { foodId: số lượng }
+           food: {} };
 }
 let S;
 try { S = Object.assign(defaultSave(), JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); }
@@ -84,6 +86,8 @@ S.basket = [];
 // Tương thích save cũ: thể lực mặc định đầy, timestamp hồi phục = bây giờ
 if (S.stamina == null) S.stamina = STAMINA.max;
 if (!S.staminaTs) S.staminaTs = Date.now();
+// Tương thích save cũ: kho đồ ăn
+if (!S.food || typeof S.food !== 'object') S.food = {};
 regenStamina(); // hồi thể lực theo thời gian thực kể từ lần chơi trước
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 function rod() { return RODS.find(r => r.id === S.rod) || RODS[0]; }
@@ -137,21 +141,6 @@ function checkStamWarn() {
     toast('⚠️ Thể lực thấp! Về nhà nghỉ ngơi kẻo kiệt sức...');
     Sfx.fail();
   }
-}
-// Số lần nghỉ ngơi còn lại trong ngày
-function restsLeft() {
-  const t = todayStr();
-  if (!S.restDay || S.restDay.date !== t) S.restDay = { date: t, count: 0 };
-  return Math.max(0, STAMINA.restPerDay - S.restDay.count);
-}
-function doRest() {
-  if (restsLeft() <= 0) { toast('Hôm nay đã nghỉ đủ ' + STAMINA.restPerDay + ' lần rồi! Mai nghỉ tiếp nhé 😴'); Sfx.fail(); return; }
-  if ((S.stamina || 0) >= STAMINA.max) { toast('Thể lực đang đầy ắp, nghỉ gì nữa! 💪'); return; }
-  S.restDay.count++;
-  S.stamina = Math.min(STAMINA.max, (S.stamina || 0) + STAMINA.restGain);
-  S.staminaTs = Date.now();
-  save(); Sfx.caught(); updateHUD();
-  toast('😴 Nghỉ ngơi xong, thể lực +' + STAMINA.restGain + '! (còn ' + restsLeft() + '/' + STAMINA.restPerDay + ' lần hôm nay)');
 }
 function stamFillColor(v) { return v > 50 ? '#66bb6a' : (v > STAMINA.warnAt ? '#ffca28' : '#ef5350'); }
 function mapUnlocked(id) {
@@ -240,7 +229,7 @@ let lastClockMin = -1;        // phút game đã hiển thị trên HUD (tránh 
 /* ---------- DOM helper ---------- */
 const $ = id => document.getElementById(id);
 const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-dig', 'pop-result', 'scr-map', 'scr-quest',
-  'scr-call', 'scr-wifehome', 'scr-kitchen', 'scr-leaderboard', 'scr-name', 'scr-container'];
+  'scr-call', 'scr-wifehome', 'scr-kitchen', 'scr-leaderboard', 'scr-name', 'scr-container', 'scr-food'];
 function show(id) {
   screens.forEach(s => $(s).classList.toggle('hidden', s !== id));
   $('hud').classList.toggle('hidden', !(id === null && isFishing()));
@@ -295,12 +284,6 @@ function updateHUD() {
     wstam.textContent = sv;
     const wf = $('wh-stam-fill'); if (wf) { wf.style.width = sv + '%'; wf.style.background = scol; }
   }
-  // Nút "Nghỉ ngơi" (menu + màn hình nhà): +40, tối đa 3 lần/ngày
-  const rl = restsLeft(), cantRest = rl <= 0 || sv >= STAMINA.max;
-  const rb1 = $('btn-rest');
-  if (rb1) { rb1.disabled = cantRest; rb1.textContent = '😴 Nghỉ ngơi (+40) — còn ' + rl + '/' + STAMINA.restPerDay; }
-  const rb2 = $('btn-rest-home');
-  if (rb2) { rb2.disabled = cantRest; rb2.textContent = '😴 Nghỉ ngơi (+40) — còn ' + rl + '/' + STAMINA.restPerDay; }
   // Đợt 2: HUD mode Trốn vợ
   const wife = S.mode === 'wife' && (trip || isFishing());
   $('hud-clock').classList.toggle('hidden', !wife);
@@ -573,6 +556,15 @@ function renderShop() {
       '<div class="card-title">' + c.name + '</div>' +
       '<div class="card-desc">' + c.desc + '</div>' + btn + '</div>';
   }).join('');
+  // 🍱 Thực phẩm: hồi thể lực ngay cả khi đang câu
+  $('shop-food').innerHTML = FOODS.map(f => {
+    const qty = (S.food && S.food[f.id]) || 0;
+    return '<div class="card"><span class="cont-icon">' + f.icon + '</span>' +
+      '<div class="card-title">' + f.name + ' <span class="count">x' + qty + '</span></div>' +
+      '<div class="card-desc">+' + f.gain + ' ⚡ — ' + f.desc + '</div>' +
+      '<button class="btn small" data-act="buyfood" data-id="' + f.id + '"' +
+        (S.money < f.price ? ' disabled' : '') + '>Mua ' + fmt(f.price) + '</button></div>';
+  }).join('');
 }
 
 /* ---------- Mini-game đào giun ---------- */
@@ -616,7 +608,7 @@ function digSpawn() {
 }
 function digTap(p) {
   if (!digS || phase !== 'DIG') return;
-  if ((S.stamina || 0) <= 0) { toast('😮‍💨 Hết thể lực rồi! Về nhà nghỉ ngơi đi!'); Sfx.fail(); return; }
+  if ((S.stamina || 0) <= 0) { toast('😮‍💨 Hết thể lực! Ăn gì đó hoặc nghỉ một lát...'); Sfx.fail(); return; }
   Sfx.init();
   const r = cv.getBoundingClientRect();
   const hitR = Math.max(46, 48 / (r.width / L.W)); // ≥48px vật lý
@@ -669,7 +661,7 @@ function digUpdate(dt) {
 }
 function enterDig(fromShop) {
   if (digsLeft() <= 0) { toast('😮‍💨 Tay đã mỏi, mai đào tiếp nhé! (tối đa ' + DIG.perDay + ' lượt/ngày)'); return; }
-  if ((S.stamina || 0) <= 0) { toast('😮‍💨 Hết thể lực rồi! Về nhà nghỉ ngơi đi!'); Sfx.fail(); return; }
+  if ((S.stamina || 0) <= 0) { toast('😮‍💨 Hết thể lực! Ăn gì đó hoặc nghỉ một lát...'); Sfx.fail(); return; }
   S.digDay.count++; save();
   $('dig-left').textContent = 'Lượt đào còn lại hôm nay: ' + digsLeft() + '/' + DIG.perDay;
   phase = 'DIG'; show('scr-dig');
@@ -707,7 +699,7 @@ function waterBounds(x, y) {
 
 function doCast(x, y) {
   if (!waterBounds(x, y)) { toast('Chạm vào mặt nước để quăng cần!'); return; }
-  if (!drainStamina(STAMINA.cast)) { toast('😮‍💨 Hết thể lực rồi! Về nhà nghỉ ngơi đi!'); Sfx.fail(); return; }
+  if (!drainStamina(STAMINA.cast)) { toast('😮‍💨 Hết thể lực! Ăn gì đó hoặc nghỉ một lát...'); Sfx.fail(); return; }
   const maxX = castMinX() + rod().cast * castRange();
   if (x > maxX) { x = maxX; toast('Cần của bạn chỉ quăng tới đây!'); }
   fx = x; fy = y; hint = null;
@@ -1286,8 +1278,7 @@ function buyBribe(id) {
   renderBribe(); updateHUD();
 }
 bindClick('btn-to-quest', enterQuest);
-bindClick('btn-rest', doRest);
-bindClick('btn-rest-home', doRest);
+bindClick('btn-food', enterFood);
 bindClick('btn-to-shop', enterShop);
 bindClick('btn-to-help', enterHelp);
 bindClick('btn-help-back', enterMenu);
@@ -1303,6 +1294,7 @@ bindClick('btn-home', () => {
 bindClick('btn-offer-fish', offerFish);
 bindClick('btn-sell-kept', sellKept);
 bindClick('btn-cont-close', () => show(null));
+bindClick('btn-food-close', () => show(null));
 bindClick('btn-kitchen', enterKitchen);
 bindClick('btn-wh-end', enterMenu);
 bindClick('btn-dig', () => enterDig(false));
@@ -1448,6 +1440,10 @@ document.addEventListener('click', e => {
       trackSpend(c.price);
       Sfx.sell(); toast('Đã mua ' + c.icon + ' ' + c.name + '!');
     }
+  } else if (act === 'buyfood') {
+    buyFood(id);
+  } else if (act === 'eatfood') {
+    eatFood(id);
   }
   if (phase === 'PREPARE') renderPrepare();
   if (phase === 'SHOP') renderShop();
@@ -1460,15 +1456,56 @@ function buyCam() {
     Sfx.sell(); toast('Đã mua ' + CAM_PACK + ' viên cám!');
   } else toast('Không đủ tiền!');
 }
+// 🍱 Thực phẩm hồi thể lực: mua trong shop, ăn bất cứ lúc nào (kể cả đang câu)
+function foodQty(id) { return (S.food && S.food[id]) || 0; }
+function buyFood(id) {
+  const f = FOODS.find(x => x.id === id);
+  if (!f) return false;
+  if (S.money < f.price) { toast('Không đủ tiền!'); Sfx.fail(); return false; }
+  S.money -= f.price;
+  if (!S.food) S.food = {};
+  S.food[id] = foodQty(id) + 1;
+  save(); trackSpend(f.price);
+  Sfx.sell(); toast('Đã mua ' + f.icon + ' ' + f.name + '!');
+  return true;
+}
+// Popup ăn đồ hồi thể lực — mở từ nút 🍱 trên HUD lúc đang câu
+function enterFood() {
+  const rows = FOODS.map(f => {
+    const q = foodQty(f.id);
+    const btn = q > 0
+      ? '<button class="btn small" data-act="eatfood" data-id="' + f.id + '">Ăn</button>'
+      : '<button class="btn small" disabled>Hết</button>';
+    return '<div class="kept-row"><span class="kept-ico">' + f.icon + '</span>' +
+      '<span class="kept-who"><b>' + f.name + ' ×' + q + '</b>' +
+      '<small>+' + f.gain + ' ⚡ thể lực</small></span>' + btn + '</div>';
+  }).join('');
+  $('food-list').innerHTML = rows || '<p class="kept-empty">Chưa có đồ ăn, vào shop mua nhé 🍱</p>';
+  $('food-sub').textContent = '⚡ Thể lực hiện tại: ' + Math.round(S.stamina || 0) + '/' + STAMINA.max;
+  show('scr-food');
+}
+function eatFood(id) {
+  const f = FOODS.find(x => x.id === id);
+  if (!f) return false;
+  if (foodQty(id) <= 0) { toast('Hết ' + f.name + ' rồi!'); Sfx.fail(); return false; }
+  S.food[id]--;
+  regenStamina();
+  S.stamina = Math.min(STAMINA.max, (S.stamina || 0) + f.gain);
+  S.staminaTs = Date.now();
+  save(); Sfx.caught(); updateHUD();
+  toast('+' + f.gain + ' ⚡ Ngon quá!');
+  enterFood(); // vẽ lại popup (cập nhật số lượng + thể lực)
+  return true;
+}
 // Đợt 2: theo dõi chi tiêu đồ câu trong ngày — quá 5.000đ → vợ lườm
 function trackSpend(amount) {
   const t = todayStr();
   if (!S.spendDay || S.spendDay.date !== t) S.spendDay = { date: t, total: 0, flagged: false };
   S.spendDay.total += amount;
-  if (S.spendDay.total > 5000 && !S.spendDay.flagged) {
+  if (S.spendDay.total > 50000 && !S.spendDay.flagged) {
     S.spendDay.flagged = true;
     save();
-    addSuspicion(10, 'tiêu hơn 5.000đ đồ câu trong 1 ngày!');
+    addSuspicion(10, 'tiêu hơn 50.000đ đồ câu trong 1 ngày!');
   }
   save();
 }
@@ -1826,13 +1863,18 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     selectSpot(i) { spot = RIVER_SPOTS[i]; },
     // Đồ đựng cá (test)
     cont() { return { containers: S.containers.slice(), active: S.activeContainer, kept: S.keptFish.slice(), cap: contDef().cap }; },    contKg() { return keptKg(); }, contLoad() { return contLoad(); },
-    // Thể lực (test)
+    // Thể lực + đồ ăn (test)
     stam() { return { v: S.stamina, ts: S.staminaTs }; },
     setStam(v) { S.stamina = v; save(); updateHUD(); },
     setStamTs(ts) { S.staminaTs = ts; save(); },
-    rest() { doRest(); },
-    rests() { return restsLeft(); },
     regen() { regenStamina(); return S.stamina; },
+    food() { return Object.assign({}, S.food); },
+    buyFoodTest(id) { return buyFood(id); },
+    eatFoodTest(id) { return eatFood(id); },
+    openFood() { enterFood(); },
+    castAt(x, y) { doCast(x, y); },
+    digNow(fromShop) { enterDig(!!fromShop); },
+    fishAt(mapId) { enterFish(mapId); },
     digWorms() { return (digS && digS.worms || []).filter(w => !w.caught).map(w => ({ x: w.x, y: w.y })); },
     digAt(x, y) { digTap({ x, y }); },
     dug() { return digS ? digS.dug : -1; },
