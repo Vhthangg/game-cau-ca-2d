@@ -63,8 +63,9 @@ function defaultSave() {
            suspicion: 0, sincerity: 0, happiness: 0, merit: 0, totalMerit: 0, buffUntil: 0,
            banUntil: '', spendDay: null, basket: [], weekEntries: {}, weekEval: '',
            wifeApproved: false, titles: [], lateCount: 0,
-           // Bảng xếp hạng
-           totalEarned: 0, biggestFish: 0, playerName: '', lbSent: 0,
+           // Bảng xếp hạng đa thành tựu
+           totalEarned: 0, biggestFish: 0, biggestFishName: '', playerName: '', lbSent: 0,
+           wifeGiven: 0, statDay: null, statWeek: null, lbStat: null,
            // Hệ thống đồ đựng cá (mode Trốn vợ): câu ở bờ KHÔNG bán ngay,
            // chỉ "Cho vào đồ đựng" — về nhà mới Bán/Dâng/Nấu. (Tự do giữ nguyên.)
            containers: ['xo'], activeContainer: 'xo', keptFish: [],
@@ -89,6 +90,11 @@ if (S.stamina == null) S.stamina = STAMINA.max;
 if (!S.staminaTs) S.staminaTs = Date.now();
 // Di trú kho đồ + túi đi câu (cần: string[] -> [{iid,id,cond}]; giun/cam/food -> store)
 migrateStoreBag();
+// Di trú BXH đa thành tựu: save cũ thiếu field thì 0/null, không mất đồ
+if (S.wifeGiven == null) S.wifeGiven = 0;
+if (S.biggestFishName == null) S.biggestFishName = '';
+if (!S.statDay || typeof S.statDay !== 'object') S.statDay = null;
+if (!S.statWeek || typeof S.statWeek !== 'object') S.statWeek = null;
 regenStamina(); // hồi thể lực theo thời gian thực kể từ lần chơi trước
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 /* ---------- Kho ở nhà + Túi đi câu + Độ bền cần ---------- */
@@ -1232,9 +1238,11 @@ function fightWin() {
   S.totalFish = (S.totalFish || 0) + 1;
   if (S.map === 'ao') S.caughtAo = (S.caughtAo || 0) + 1;
   if (S.map === 'song') S.caughtSong = (S.caughtSong || 0) + 1; // mở khóa đầm phá
-  if (lastWeight > (S.biggestFish || 0)) S.biggestFish = lastWeight; // BXH: cá to nhất
+  statTick('caught'); // BXH đa thành tựu: đếm theo ngày/tuần
+  if (lastWeight > (S.biggestFish || 0)) { S.biggestFish = lastWeight; S.biggestFishName = fish.name; } // BXH: thủy quái
   save();
   questEvent('catch', { fishId: fish.id, weight: lastWeight, map: S.map, spot: spot && spot.id, bait: S.bait });
+  lbSync(); // đồng bộ BXH ngầm sau mỗi lần bắt
   fight = null; phase = 'RESULT';
   $('res-title').textContent = '🐟 Dính cá!';
   $('res-name').textContent = fish.name;
@@ -1425,10 +1433,13 @@ function offerFish() {
   const down = Math.min(30, n * 8);
   S.suspicion = Math.max(0, (S.suspicion || 0) - down);
   S.happiness = clamp((S.happiness || 0) + n * 10, 0, 100);
+  S.wifeGiven = (S.wifeGiven || 0) + n; // BXH: dâng vợ nhiều nhất
+  statTick('wife');
   S.keptFish = [];
   save();
   toast('🎁 ' + funny(FUNNY_GIFT) + ' (-' + down + ' nghi ngờ)');
   Sfx.caught();
+  lbSync(); // đồng bộ BXH ngầm
   if ((S.happiness || 0) >= 80) addTitle('Chồng quốc dân');
   renderWifeHome(); updateHUD();
 }
@@ -1443,7 +1454,7 @@ function sellKept() {
   S.keptFish = [];
   save();
   Sfx.sell();
-  lbAfterSell(); // gửi điểm BXH ngầm
+  lbSync(); // đồng bộ BXH ngầm
   flyMoney('+' + fmt(total));
   addSuspicion(5, 'tiền bán cá giấu ở đâu?');
   toast('💰 ' + funny(FUNNY_SELL, { price: fmt(total) }));
@@ -1727,7 +1738,7 @@ function burstConfetti(panel) {
 bindClick('btn-sell', () => {
   S.money += lastPrice; S.totalEarned = (S.totalEarned || 0) + lastPrice; save(); Sfx.sell();
   questEvent('sell');
-  lbAfterSell(); // gửi điểm BXH ngầm
+  lbSync(); // đồng bộ BXH ngầm
   flyMoney('+' + fmt(lastPrice));
   toast('Đã bán cá +' + fmt(lastPrice) + '!');
   $('pop-result').classList.add('hidden');
@@ -1749,9 +1760,11 @@ function keepFishToContainer() {
   return true;
 }
 bindClick('btn-wife-keep', keepFishToContainer);
-bindClick('btn-wife-release', () => {
+// Mọi lần thả cá đều tính phóng sinh: +phúc đức, đếm BXH, đủ 10 nhận buff
+function gainMerit() {
   S.merit = (S.merit || 0) + 1;
   S.totalMerit = (S.totalMerit || 0) + 1;
+  statTick('released'); // BXH đa thành tựu
   save();
   if (S.merit >= 10) {
     S.merit -= 10;
@@ -1760,6 +1773,10 @@ bindClick('btn-wife-release', () => {
     toast('🍀 Đủ 10 Phúc đức! "Cá lớn phù hộ" — 1 giờ tới dễ gặp cá to hơn!');
   }
   if (S.totalMerit >= 20) addTitle('Người phóng sinh');
+}
+bindClick('btn-wife-release', () => {
+  gainMerit();
+  lbSync(); // đồng bộ BXH ngầm
   showFunny(funny(FUNNY_RELEASE));
 });
 bindClick('btn-wife-continue', () => {
@@ -1767,7 +1784,9 @@ bindClick('btn-wife-continue', () => {
   afterAttempt();
 });
 bindClick('btn-release', () => {
-  toast('Đã thả cá về ao.');
+  gainMerit();
+  lbSync(); // đồng bộ BXH ngầm
+  toast('Đã thả cá về ao. 🕊️');
   $('pop-result').classList.add('hidden');
   afterAttempt();
 });
@@ -2273,14 +2292,77 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
-/* ---------- Bảng xếp hạng (Vercel Blob, /api/leaderboard) ---------- */
+/* ---------- Bảng xếp hạng đa thành tựu (Vercel Blob, /api/leaderboard) ---------- */
 const LB_URL = '/api/leaderboard';
 const LB_MEDAL = ['🥇', '🥈', '🥉'];
+// Hạng mục: caught = câu nhiều nhất | released = phóng sinh | wife = dâng vợ | biggest = thủy quái (chỉ all-time)
+const LB_CATS = {
+  caught:   { icon: '🎣', name: 'Câu nhiều nhất' },
+  released: { icon: '🕊️', name: 'Phóng sinh nhiều nhất' },
+  wife:     { icon: '💝', name: 'Dâng vợ nhiều nhất' },
+  biggest:  { icon: '👹', name: 'Thủy quái to nhất' },
+};
+const LB_WINS = { day: '📅 Ngày', week: '📆 Tuần', all: '🏆 Mọi thời đại' };
+let lbCat = 'caught', lbWin = 'day';
 function lbName() { return (S.playerName || '').trim(); }
 function randomAnglerName() { return 'Cần thủ ' + Math.floor(100 + Math.random() * 900); }
 function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// Đếm thành tựu theo ngày/tuần: qua ngày/tuần mới tự reset
+function statTick(kind) {
+  const dk = todayStr(), wk = mondayStr(new Date());
+  if (!S.statDay || S.statDay.d !== dk) S.statDay = { d: dk, caught: 0, released: 0, wife: 0 };
+  if (!S.statWeek || S.statWeek.w !== wk) S.statWeek = { w: wk, caught: 0, released: 0, wife: 0 };
+  if (kind === 'caught') { S.statDay.caught++; S.statWeek.caught++; }
+  else if (kind === 'released') { S.statDay.released++; S.statWeek.released++; }
+  else if (kind === 'wife') { S.statDay.wife++; S.statWeek.wife++; }
+  save();
+}
+// Chỉ số của mình theo hạng mục + kỳ đang chọn (panel cá nhân, luôn hiện kể cả offline)
+function myLbValue(cat, win) {
+  const dk = todayStr(), wk = mondayStr(new Date());
+  const D = (S.statDay && S.statDay.d === dk) ? S.statDay : null;
+  const W = (S.statWeek && S.statWeek.w === wk) ? S.statWeek : null;
+  if (cat === 'caught') return win === 'day' ? (D ? D.caught : 0) : win === 'week' ? (W ? W.caught : 0) : (S.totalFish || 0);
+  if (cat === 'released') return win === 'day' ? (D ? D.released : 0) : win === 'week' ? (W ? W.released : 0) : (S.totalMerit || 0);
+  if (cat === 'wife') return win === 'day' ? (D ? D.wife : 0) : win === 'week' ? (W ? W.wife : 0) : (S.wifeGiven || 0);
+  return S.biggestFish || 0; // biggest: chỉ mọi thời đại
+}
+function fmtLbValue(cat, v) {
+  return cat === 'biggest' ? (Number(v) || 0).toFixed(2) + ' kg' : Math.floor(Number(v) || 0) + ' con';
+}
+// Block stat gửi lên server
+function lbStatBlock() {
+  const D = S.statDay || {}, W = S.statWeek || {};
+  return {
+    name: lbName(), level: level(), score: S.totalEarned || 0,
+    day: D.d || '', dc: D.caught || 0, dr: D.released || 0, dw: D.wife || 0,
+    week: W.w || '', wc: W.caught || 0, wr: W.released || 0, ww: W.wife || 0,
+    tc: S.totalFish || 0, rel: S.totalMerit || 0, wife: S.wifeGiven || 0,
+    bigKg: S.biggestFish || 0, bigName: S.biggestFishName || '',
+  };
+}
+function lbStatChanged() {
+  const cur = lbStatBlock(), prev = S.lbStat || {};
+  return ['score', 'dc', 'dr', 'dw', 'wc', 'wr', 'ww', 'tc', 'rel', 'wife', 'bigKg']
+    .some(k => (cur[k] || 0) > (prev[k] || 0));
+}
+// Đồng bộ BXH ngầm: chỉ POST khi có chỉ số tăng so với lần gửi trước, lỗi bỏ qua lặng lẽ
+let lbSending = false;
+async function lbSync() {
+  if (!lbName() || lbSending || !lbStatChanged()) return;
+  lbSending = true;
+  try {
+    const r = await fetch(LB_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lbStatBlock()),
+    });
+    if (r.ok) { S.lbStat = lbStatBlock(); save(); }
+  } catch (e) { /* offline: thử lại lần sau */ }
+  lbSending = false;
 }
 function enterLeaderboard() {
   phase = 'LB';
@@ -2296,25 +2378,41 @@ function enterName(fromBoard) {
   show('scr-name');
   setTimeout(() => { try { $('lb-name-input').select(); } catch (e) {} }, 60);
 }
+function lbSetTab(cat, win) {
+  if (cat) lbCat = cat;
+  if (win) lbWin = win;
+  if (lbCat === 'biggest') lbWin = 'all'; // thủy quái chỉ có mọi thời đại
+  document.querySelectorAll('#lb-cat-tabs .lb-tab').forEach(b =>
+    b.classList.toggle('sel', b.dataset.cat === lbCat));
+  document.querySelectorAll('#lb-win-tabs .lb-tab').forEach(b =>
+    b.classList.toggle('sel', b.dataset.win === lbWin));
+  $('lb-win-tabs').classList.toggle('hidden', lbCat === 'biggest');
+  loadBoard();
+}
+function lbRowValue(e) {
+  return e.unit === 'kg' ? (Number(e.value) || 0).toFixed(2) + ' kg' : Math.floor(Number(e.value) || 0) + ' con';
+}
 async function loadBoard() {
-  const st = $('lb-status'), list = $('lb-list'), me = $('lb-me');
+  const st = $('lb-status'), list = $('lb-list');
   st.classList.remove('hidden');
   list.innerHTML = '<div class="lb-row skel"></div><div class="lb-row skel"></div><div class="lb-row skel"></div><div class="lb-row skel"></div><div class="lb-row skel"></div>';
   st.textContent = '⏳ Đang tải bảng xếp hạng...';
-  me.classList.add('hidden');
+  renderLbMe(-1); // panel cá nhân luôn hiện trước
   try {
-    const r = await fetch(LB_URL, { cache: 'no-store' });
+    const r = await fetch(LB_URL + '?cat=' + lbCat + '&win=' + lbWin, { cache: 'no-store' });
     if (!r.ok) throw new Error('http ' + r.status);
     const data = await r.json();
-    renderBoard(data.top || []);
+    renderBoard(data);
   } catch (e) {
-    // Chế độ offline: báo nhẹ, game vẫn chơi bình thường
-    st.textContent = '📡 Chưa kết nối được bảng xếp hạng — chơi tiếp nhé!';
+    // Chế độ offline: 1 dòng nhẹ, không spam — vẫn xem được thành tích cá nhân
+    st.textContent = '📡 BXH online chưa kết nối — xem tạm thành tích của bạn nhé!';
+    list.innerHTML = '';
   }
 }
-function renderBoard(top) {
-  const st = $('lb-status'), list = $('lb-list'), me = $('lb-me');
+function renderBoard(data) {
+  const st = $('lb-status'), list = $('lb-list');
   st.classList.add('hidden');
+  const top = (data && data.top) || [];
   const name = lbName();
   if (!top.length) {
     list.innerHTML = '<p class="subtitle">Chưa có ai trên bảng — bạn sẽ là người đầu tiên? 🎣</p>';
@@ -2322,41 +2420,38 @@ function renderBoard(top) {
     list.innerHTML = top.map((e, i) => {
       const isMe = e.name === name;
       const pos = LB_MEDAL[i] || ('<span class="lb-rank">' + (i + 1) + '</span>');
+      const sub = '⭐ Cấp ' + (e.level || 1) + (e.bigName ? ' • 👹 ' + escHtml(e.bigName) : '');
       return '<div class="lb-row' + (isMe ? ' lb-me-row' : '') + '">' +
         '<span class="lb-pos">' + pos + '</span>' +
         '<span class="lb-who"><b>' + escHtml(e.name) + '</b>' +
-        '<small>⭐ Cấp ' + (e.level || 1) + ' • 🐟 ' + (Number(e.bigFish) || 0).toFixed(2) + ' kg</small></span>' +
-        '<span class="lb-score">' + fmt(e.score) + '</span>' +
+        '<small>' + sub + '</small></span>' +
+        '<span class="lb-score">' + escHtml(lbRowValue(e)) + '</span>' +
         '</div>';
     }).join('');
   }
-  const mine = top.findIndex(e => e.name === name);
-  me.classList.remove('hidden');
-  me.innerHTML = '🎣 <b>' + escHtml(name) + '</b> — tổng đã kiếm: <b>' + fmt(S.totalEarned || 0) + '</b>' +
-    ' • cá to nhất: <b>' + (Number(S.biggestFish) || 0).toFixed(2) + ' kg</b>' +
-    (mine >= 0 ? ' • hạng <b>#' + (mine + 1) + '</b> 🏅' : '');
+  renderLbMe(top.findIndex(e => e.name === name));
 }
-// Gửi điểm ngầm sau mỗi lần bán cá — chỉ gửi khi điểm cao hơn lần trước, thất bại bỏ qua lặng lẽ
-let lbSending = false;
-async function lbAfterSell() {
-  const cur = S.totalEarned || 0;
-  if (cur <= 0 || cur <= (S.lbSent || 0)) return;
-  if (!lbName() || lbSending) return;
-  lbSending = true;
-  try {
-    const r = await fetch(LB_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: lbName(), score: cur, bigFish: S.biggestFish || 0, level: level() }),
-    });
-    if (r.ok) { S.lbSent = cur; save(); }
-  } catch (e) { /* offline: thử lại lần bán sau */ }
-  lbSending = false;
+// Panel "Thành tích của bạn" — luôn hiện kể cả offline
+function renderLbMe(rank) {
+  const me = $('lb-me');
+  const v = myLbValue(lbCat, lbWin);
+  const catName = LB_CATS[lbCat].icon + ' ' + LB_CATS[lbCat].name;
+  const winName = LB_WINS[lbWin];
+  let extra = '';
+  if (lbCat === 'biggest' && S.biggestFishName) extra = ' (' + escHtml(S.biggestFishName) + ')';
+  me.classList.remove('hidden');
+  me.innerHTML = '🏅 <b>Thành tích của bạn</b> — ' + catName + ' · ' + winName +
+    ': <b>' + escHtml(fmtLbValue(lbCat, v)) + '</b>' + extra +
+    (rank >= 0 ? ' • hạng <b>#' + (rank + 1) + '</b> 🏅' : '');
 }
 bindClick('btn-to-leaderboard', enterLeaderboard);
 bindClick('btn-lb-back', enterMenu);
 bindClick('btn-lb-reload', () => loadBoard());
 bindClick('btn-lb-name', () => enterName(false));
+document.querySelectorAll('#lb-cat-tabs .lb-tab').forEach(b =>
+  b.addEventListener('click', () => { Sfx.init(); Sfx.click(); lbSetTab(b.dataset.cat, null); }));
+document.querySelectorAll('#lb-win-tabs .lb-tab').forEach(b =>
+  b.addEventListener('click', () => { Sfx.init(); Sfx.click(); lbSetTab(null, b.dataset.win); }));
 bindClick('btn-name-ok', () => {
   const v = $('lb-name-input').value.replace(/[<>&"']/g, '').trim().slice(0, 20);
   if (!v) { toast('Nhập tên đi bạn ơi!'); return; }
@@ -2458,6 +2553,13 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     bagCaps() { return BAG_CAPS; },
     showPrepare() { enterPrepare(); },
     showShop() { enterShop(); },
+    // BXH đa thành tựu (test)
+    statTick(k) { statTick(k); },
+    lbBlock() { return lbStatBlock(); },
+    lbTab(cat, win) { lbSetTab(cat, win); return { cat: lbCat, win: lbWin }; },
+    myVal(cat, win) { return myLbValue(cat, win); },
+    doGainMerit() { gainMerit(); },
+    doOfferFish() { offerFish(); },
   };
 }
 
@@ -2471,7 +2573,9 @@ window.__dbg = {
   strike: () => strike ? { pos: strike.pos, zc: strike.zc, zw: strike.zw } : null,
   fight: () => fight ? { tension: fight.tension, zc: fight.zc } : null,
   lb: () => ({ name: lbName(), totalEarned: S.totalEarned || 0, lbSent: S.lbSent || 0,
-               biggestFish: S.biggestFish || 0 }),
+               biggestFish: S.biggestFish || 0, biggestFishName: S.biggestFishName || '',
+               wifeGiven: S.wifeGiven || 0, totalMerit: S.totalMerit || 0,
+               statDay: S.statDay, statWeek: S.statWeek, lbStat: S.lbStat || null }),
   dig: () => (typeof digS !== 'undefined' && digS ? {
     dug: digS.dug, timeLeft: digS.timeLeft,
     worms: digS.worms.filter(w => !w.caught).map(w => Art.wormHead(w, tG)),
