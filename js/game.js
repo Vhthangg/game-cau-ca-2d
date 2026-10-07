@@ -770,6 +770,12 @@ function renderPrepare() {
   // --- Mồi đang chọn (lấy trong túi) ---
   // Lure cần cần máy: nếu đang chọn lure mà không còn cần máy trong túi → về giun
   if (!baitUsable(S.bait)) { S.bait = 'giun'; save(); }
+  // Mồi đang chọn đã hết trong túi → tự chuyển sang loại còn hàng (ưu tiên giun → cám → mồi cao cấp)
+  // (kiểm tra TÚI mang theo, vì khi câu mồi trừ từ túi — hasBait() ở màn này lại đang nhìn vào kho)
+  if (!bagHasBait(S.bait)) {
+    const other = ['giun', 'cam', 'moi-u', 'de-chui', 'lure'].find(b => b !== S.bait && bagHasBait(b) && baitUsable(b));
+    if (other) { S.bait = other; save(); }
+  }
   $('bait-giun-count').textContent = 'x' + (S.bag.giun || 0);
   $('bait-cam-count').textContent = 'x' + (S.bag.cam || 0);
   $('bait-mou-count').textContent = 'x' + (S.bag.moiU || 0);
@@ -793,7 +799,7 @@ function renderPrepare() {
     const card = $('card-' + (b === 'moi-u' ? 'mou' : (b === 'de-chui' ? 'dechui' : b)));
     if (card) card.classList.toggle('selected', S.bait === b);
   });
-  const baitOk = hasBait(S.bait) && baitUsable(S.bait);
+  const baitOk = bagHasBait(S.bait) && baitUsable(S.bait);
   const hasRod = S.bag.rods.length > 0;
   $('btn-go-fish').disabled = !baitOk || !hasRod;
   const hintEl = $('prep-nobait-hint');
@@ -1344,6 +1350,8 @@ function afterAttempt() {
 }
 // Còn mồi này trong túi không? (lure không hao nên chỉ cần đang sở hữu)
 function hasBait(b) { return (inv()[baitKey(b)] || 0) > 0; }
+// Riêng màn Chuẩn bị: kiểm tra TÚI mang theo (inv() ở màn này trả về kho, không đúng)
+function bagHasBait(b) { return (S.bag[baitKey(b)] || 0) > 0; }
 // Mồi này có dùng được với cần đang cầm không? (lure chỉ cần máy)
 function baitUsable(b) {
   if (b !== 'lure') return true;
@@ -1777,6 +1785,7 @@ function selectBait(b) {
   if (b === 'lure' && !baitUsable('lure')) {
     toast('🎣 Mồi giả chỉ dùng được với cần máy! (Daiwa Crossfire 2.4m trở lên)'); Sfx.fail(); return;
   }
+  if (!bagHasBait(b)) { toast('Hết ' + BAITS[b].name + ' trong túi rồi!'); Sfx.fail(); return; }
   S.bait = b; save(); Sfx.click(); renderPrepare();
 }
 [['card-giun', 'giun'], ['card-cam', 'cam'], ['card-mou', 'moi-u'], ['card-dechui', 'de-chui'], ['card-lure', 'lure']]
