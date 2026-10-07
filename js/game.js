@@ -255,6 +255,7 @@ function level() { return Math.min(15, Math.floor((S.totalFish || 0) / 10) + 1);
 let stamWarned = false;  // cảnh báo thể lực thấp 1 lần mỗi chuyến
 let rodWarned = false;   // cảnh báo cần sắp hỏng 1 lần mỗi chuyến
 let stamRegenT = 0;
+let ambT = 0; // đếm giờ cập nhật ambient theo mood
 // Hồi phục theo thời gian thực: +1 mỗi STAMINA.regenSec giây, tối đa STAMINA.max.
 // Tính từ staminaTs (lần cập nhật cuối) nên thoát game quay lại vẫn được hồi.
 function regenStamina() {
@@ -360,7 +361,17 @@ let fish = null, biteT = 0;   // cá đang cắn
 let strike = null;            // {pos, dur, zc, zw}
 let fight = null;             // {tension, prog, zt, amp, speed, zw, zc, surge, fill, breakT, slackT, surgeT}
 let holding = false;          // đang giữ để bo cá
-let splashes = [];            // hạt nước
+let splashes = [];            // hạt nước (vòng tròn lan)
+let ripples = [];             // gợn sóng lan rộng (ellipse trên mặt nước)
+let drops = [];               // giọt nước bắn lên, có trọng lực (tối đa 80)
+// Bắn giọt nước tại (x,y): n giọt, vận tốc ngang ±spread, vy lên -260..-60
+function spawnDrops(x, y, n, spread) {
+  for (let i = 0; i < n; i++) {
+    if (drops.length >= 80) drops.shift();
+    drops.push({ x: x + rnd(-8, 8), y: y, vx: rnd(-spread, spread), vy: rnd(-260, -60),
+                 r: rnd(1.6, 3.4), life: rnd(0.35, 0.7), a: 0.9 });
+  }
+}
 let hint = null;              // chữ gợi ý trên canvas
 let lastPrice = 0, lastWeight = 0;
 let toastTimer = null;
@@ -919,8 +930,9 @@ function doCast(x, y) {
   const maxX = castMinX() + rod().cast * castRange();
   if (x > maxX) { x = maxX; toast('Cần của bạn chỉ quăng tới đây!'); }
   fx = x; fy = y; hint = null;
-  Sfx.splash();
+  Sfx.waterPlip(); // "bõm" khi mồi chạm nước
   splashes.push({ x: fx, y: fy, r: 6, a: 0.9 });
+  ripples.push({ x: fx, y: fy, r: 8, a: 0.8 });
   // Chọn sẵn con cá sẽ cắn để áp hệ số mồi ưa thích / thời tiết / giờ vàng / dòng chảy
   fish = pickFish();
   let mult = 1;
@@ -1057,10 +1069,14 @@ function startFight() {
     breakT: 0, slackT: 0, surgeT: rnd(0.8, 1.6),
   };
   phase = 'FIGHT';
+  Sfx.reelStart(); // máy câu bắt đầu rít
 }
 
 function fightWin() {
   Sfx.caught();
+  Sfx.reelStop(); // dừng tiếng máy rít
+  spawnDrops(fx, fy, 10, 130); // bắt được: nước bắn tung tóe
+  Sfx.waterPlip();
   const w = rnd(fish.min, fish.max);
   lastWeight = Math.round(w * 100) / 100;
   lastPrice = Math.round(lastWeight * fish.price);
@@ -1163,7 +1179,7 @@ function showFunny(text) {
   $('res-row-wife-done').classList.remove('hidden');
 }
 function fightLost(msg) {
-  Sfx.fail(); fight = null; toast(msg);
+  Sfx.fail(); Sfx.reelStop(); fight = null; toast(msg);
   drainStamina(STAMINA.fightLost); // bo thua −4
   wearRod(2); // bo thua −2 độ bền
   questEvent('miss');
@@ -1598,6 +1614,7 @@ $('btn-mute').addEventListener('click', () => {
   Sfx.init();
   Sfx.muted = !Sfx.muted; S.muted = Sfx.muted; save();
   Music.setMuted(Sfx.muted);   // tắt/mở cả nhạc nền lẫn hiệu ứng
+  Sfx.applyMute();             // dừng mọi loop (dế/ếch/mưa/máy rít/chuông) khi tắt tiếng
   $('btn-mute').textContent = Sfx.muted ? '🔇' : '🔊';
 });
 $('btn-mute').textContent = Sfx.muted ? '🔇' : '🔊';
@@ -1769,6 +1786,19 @@ function update(dt) {
     p.r += 70 * dt; p.a -= 1.6 * dt;
     if (p.a <= 0) splashes.splice(i, 1);
   }
+  // gợn sóng lan rộng
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const p = ripples[i];
+    p.r += 55 * dt; p.a -= 1.5 * dt;
+    if (p.a <= 0) ripples.splice(i, 1);
+  }
+  // giọt nước bắn: trọng lực kéo xuống
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const p = drops[i];
+    p.vy += 1100 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+    p.a = Math.max(0, Math.min(0.9, p.life * 2));
+    if (p.life <= 0) drops.splice(i, 1);
+  }
   // Đợt 2: đồng hồ game của chuyến trốn vợ (1 phút thật = 15 phút game)
   if (S.mode === 'wife' && trip && ['SPOT', 'CAST', 'WAIT'].includes(phase)) {
     trip.gameMin += dt * WIFE.gameMinPerRealSec * 60;
@@ -1806,12 +1836,14 @@ function update(dt) {
       f.surge = rnd(-1, 1) * (0.15 + (f.diff || 0) * 0.20); // cá to giãy mạnh hơn
       f.surgeT = rnd(0.8, 1.8);
       splashes.push({ x: fx + rnd(-24, 24), y: fy + rnd(-8, 8), r: 5, a: 0.9 });
-      Sfx.splash();
+      spawnDrops(fx + rnd(-20, 20), fy, 4, 90); // cá quẫy bắn nước
+      Sfx.waterPlip();
     }
     f.surge *= Math.pow(0.25, dt); // giảm dần
     f.zc = clamp(0.5 + f.amp * Math.sin(f.zt * f.speed) + f.surge, f.zw / 2 + 0.02, 1 - f.zw / 2 - 0.02);
     // lực căng
     f.tension = clamp(f.tension + (holding ? 0.95 : -0.75) * dt, 0, 1);
+    Sfx.reelUpdate(f.tension); // máy câu rít theo lực căng
     const inZone = Math.abs(f.tension - f.zc) <= f.zw / 2;
     if (inZone) f.prog += f.fill * dt;
     // đứt dây / tuột cá
@@ -1850,7 +1882,7 @@ function triggerCall() {
   trip.resumePhase = phase;
   phase = 'CALL';
   show('scr-call');
-  Sfx.bite(); Sfx.bite();
+  Sfx.phoneRing(); // chuông "Vợ gọi" dồn dập
   $('call-title').textContent = '📱 Vợ đang gọi...';
   const ct = $('call-text');
   ct.textContent = '"Đang ở đâu đấy?!"';
@@ -1892,6 +1924,7 @@ function resolveTrick(ok) {
   resumeFromCall();
 }
 function resumeFromCall() {
+  Sfx.phoneStop(); // dừng chuông khi nghe máy / hết giờ
   phase = (trip && trip.resumePhase) || 'CAST';
   show(null);
   updateHUD();
@@ -1939,7 +1972,7 @@ function render() {
       return { id: S.activeContainer, x: cp.x + shx, y: cp.y, load: contLoad() };
     })(),
     float: showFloat ? { x: fx, y: fy, show: true, dy: fdy, tilt } : { show: false },
-    rodBend, splashes, biteFlash,
+    rodBend, splashes, drops, ripples, biteFlash,
     castHint: phase === 'CAST',
     maxCastX: castMinX() + rod().cast * castRange(),
     hint: (phase === 'CAST' || phase === 'WAIT' || phase === 'BITE') ? phaseHint : null,
@@ -1965,6 +1998,13 @@ function loop(ts) {
   // Thể lực hồi dần theo thời gian thực kể cả khi đang mở game
   stamRegenT += dt;
   if (stamRegenT >= 5) { stamRegenT = 0; regenStamina(); }
+  // Trụ cột 1: ambient (dế/ếch/mưa) pha trộn theo mood, kiểm tra mỗi 4s
+  ambT += dt;
+  if (ambT >= 4) {
+    ambT = 0;
+    const _d = new Date();
+    Sfx.setAmbient(Art.moodFor(_d.getHours() + _d.getMinutes() / 60, session.golden, session.weather), S.map);
+  }
   // Đợt 2: cập nhật đồng hồ game trên HUD theo từng phút
   if (S.mode === 'wife' && trip && ! $('hud-clock').classList.contains('hidden')) {
     const cm = Math.floor(trip.gameMin);
