@@ -436,6 +436,9 @@ body.is-portrait #toast { bottom: calc(104px + env(safe-area-inset-bottom)); fon
 body.is-portrait #pop-result .panel { max-width: 100%; }
 
 /* ============ Bảng xếp hạng ============ */
+.lb-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.lb-tab { opacity: .72; }
+.lb-tab.sel { opacity: 1; outline: 2px solid var(--brand-500); outline-offset: -2px; font-weight: bold; }
 .lb-status { color: var(--muted); font-size: 15px; margin: 10px 0; line-height: 1.6; }
 .lb-row.skel {
   border-color: #eee;

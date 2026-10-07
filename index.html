@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Câu Cá Ao Làng</title>
-<link rel="stylesheet" href="style.css?v=20261007j">
+<link rel="stylesheet" href="style.css?v=20261007k">
 </head>
 <body>
 <div id="wrap">
@@ -89,7 +89,18 @@
     <div id="scr-leaderboard" class="screen hidden">
       <div class="panel wide">
         <h2>🏆 Bảng xếp hạng</h2>
-        <p class="subtitle">Tổng tiền bán cá tích lũy mọi thời đại — ai là đại gia làng câu?</p>
+        <p class="subtitle">Vinh danh cần thủ làng — theo ngày, theo tuần, mọi thời đại!</p>
+        <div class="lb-tabs" id="lb-cat-tabs">
+          <button class="btn small lb-tab sel" data-cat="caught">🎣 Câu nhiều nhất</button>
+          <button class="btn small lb-tab" data-cat="released">🕊️ Phóng sinh</button>
+          <button class="btn small lb-tab" data-cat="wife">💝 Dâng vợ</button>
+          <button class="btn small lb-tab" data-cat="biggest">👹 Thủy quái</button>
+        </div>
+        <div class="lb-tabs" id="lb-win-tabs">
+          <button class="btn small lb-tab sel" data-win="day">📅 Ngày</button>
+          <button class="btn small lb-tab" data-win="week">📆 Tuần</button>
+          <button class="btn small lb-tab" data-win="all">🏆 Mọi thời đại</button>
+        </div>
         <p id="lb-me" class="lb-me hidden"></p>
         <div id="lb-status" class="lb-status">⏳ Đang tải bảng xếp hạng...</div>
         <div id="lb-list" class="lb-list"></div>
@@ -314,9 +325,9 @@
   </div>
 </div>
 
-<script src="js/config.js?v=20261007j"></script>
-<script src="js/audio.js?v=20261007j"></script>
-<script src="js/art.js?v=20261007j"></script>
-<script src="js/game.js?v=20261007j"></script>
+<script src="js/config.js?v=20261007k"></script>
+<script src="js/audio.js?v=20261007k"></script>
+<script src="js/art.js?v=20261007k"></script>
+<script src="js/game.js?v=20261007k"></script>
 </body>
 </html>
