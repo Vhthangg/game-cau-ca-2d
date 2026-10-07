@@ -1787,6 +1787,50 @@ function selectBait(b) {
     });
   });
 
+// Ấn giữ nút số lượng để tăng/giảm nhanh (xếp mồi/đồ ăn vào túi, mua cám/mồi/đồ ăn)
+// Chạm nhanh = 1 lần (click thường). Giữ ≥450ms = lặp lại, càng giữ càng nhanh.
+const REPEAT_ACTS = { bagstep: 1, bagfoodstep: 1, buycam: 1, buymou: 1, buydechui: 1, buyfood: 1 };
+let holdT = null, holdRep = null, holdDesc = null, holdSuppress = null;
+function holdSelector(d) {
+  let s = '[data-act="' + d.act + '"]';
+  if (d.kind) s += '[data-kind="' + d.kind + '"]';
+  if (d.id) s += '[data-id="' + d.id + '"]';
+  if (d.d) s += '[data-d="' + d.d + '"]';
+  return s;
+}
+function holdStop() { clearTimeout(holdT); clearTimeout(holdRep); holdT = holdRep = null; holdDesc = null; }
+function holdFire() {
+  if (!holdDesc) return;
+  const btn = document.querySelector(holdSelector(holdDesc));
+  if (!btn || btn.disabled) { holdStop(); return; }
+  btn.click(); // tái dùng đúng handler click hiện tại
+}
+document.addEventListener('pointerdown', e => {
+  const btn = e.target.closest && e.target.closest('[data-act]');
+  if (!btn || btn.disabled || !REPEAT_ACTS[btn.dataset.act]) return;
+  holdStop(); holdSuppress = null;
+  holdDesc = { act: btn.dataset.act, kind: btn.dataset.kind, id: btn.dataset.id, d: btn.dataset.d };
+  holdT = setTimeout(() => {
+    holdSuppress = holdDesc; // chặn click "thừa" khi nhả tay sau lúc giữ
+    holdFire();
+    let gap = 150;
+    const step = () => { holdFire(); gap = Math.max(55, gap * 0.9); holdRep = setTimeout(step, gap); };
+    holdRep = setTimeout(step, gap);
+  }, 450);
+}, { passive: true });
+['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, holdStop, { passive: true }));
+// Chặn click thừa sau khi ấn giữ (không chặn chạm nhanh bình thường)
+document.addEventListener('click', e => {
+  if (holdSuppress) {
+    const btn = e.target.closest && e.target.closest('[data-act]');
+    const d = holdSuppress; holdSuppress = null;
+    if (btn && btn.dataset.act === d.act && (btn.dataset.kind || '') === (d.kind || '') &&
+        (btn.dataset.id || '') === (d.id || '') && (btn.dataset.d || '') === (d.d || '')) {
+      e.stopPropagation(); e.preventDefault(); return;
+    }
+  }
+}, true);
+
 // Mua / trang bị (event delegation cho danh sách render động)
 document.addEventListener('click', e => {
   const m = e.target.closest('[data-map]');
