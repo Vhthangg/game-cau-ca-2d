@@ -675,30 +675,41 @@ function renderPrepare() {
       '%;background:' + condColor(inst.cond) + '"></i></div></div>' +
       '<div class="card-desc">' + (packed ? 'Chạm để bỏ ra khỏi túi' : 'Chạm để cho vào túi') + '</div></div>';
   }).join('') || '<p class="kept-empty">Chưa có cần nào!</p>';
-  // --- Túi: mồi & đồ ăn ---
+  // --- Túi: mồi & đồ ăn (chỉ hiện món đang sở hữu, chưa có thì ẩn) ---
   const camGoiBag = Math.floor((S.bag.cam || 0) / CAM_PACK);
   const camGoiMax = Math.min(BAG_CAPS.camGoi, Math.floor(((S.store.cam || 0) + (S.bag.cam || 0)) / CAM_PACK));
-  let items = bagStepper('giun', '🪱', 'Giun đất', S.bag.giun || 0,
+  const giunHas = (S.store.giun || 0) + (S.bag.giun || 0) > 0;
+  const camHas = (S.store.cam || 0) + (S.bag.cam || 0) > 0;
+  let items = '';
+  if (giunHas) items += bagStepper('giun', '🪱', 'Giun đất', S.bag.giun || 0,
     Math.min(BAG_CAPS.giun, (S.store.giun || 0) + (S.bag.giun || 0)), 'con', (S.store.giun || 0) + ' con');
-  items += bagStepper('camGoi', '🟤', 'Cám câu', camGoiBag, camGoiMax, 'gói', Math.floor((S.store.cam || 0) / CAM_PACK) + ' gói');
+  if (camHas) items += bagStepper('camGoi', '🟤', 'Cám câu', camGoiBag, camGoiMax, 'gói', Math.floor((S.store.cam || 0) / CAM_PACK) + ' gói');
   for (const f of FOODS) {
     const bq = (S.bag.food || {})[f.id] || 0;
-    const mx = Math.min(BAG_CAPS.foodEach, ((S.store.food || {})[f.id] || 0) + bq);
+    const sq = ((S.store.food || {})[f.id] || 0);
+    if (sq + bq <= 0) continue; // chưa sở hữu thì ẩn
+    const mx = Math.min(BAG_CAPS.foodEach, sq + bq);
     items += '<div class="card"><div class="card-title">' + f.icon + ' ' + f.name + '</div>' +
       '<div class="bag-step"><button class="btn small" data-act="bagfoodstep" data-id="' + f.id + '" data-d="-1">−</button>' +
       '<b>' + bq + ' cái</b>' +
       '<button class="btn small" data-act="bagfoodstep" data-id="' + f.id + '" data-d="1">+</button></div>' +
-      '<div class="card-desc">Tối đa ' + mx + ' cái · Kho còn ' + (((S.store.food || {})[f.id] || 0)) + '</div></div>';
+      '<div class="card-desc">Tối đa ' + mx + ' cái · Kho còn ' + sq + '</div></div>';
   }
+  if (!items) items = '<p class="kept-empty">🎒 Chưa có mồi/đồ ăn nào — đi đào giun hoặc vào Cửa hàng mua nhé!</p>';
   $('bag-items').innerHTML = items;
-  // --- Kho ở nhà ---
-  $('store-summary').innerHTML = '🪱 Giun: <b>' + (S.store.giun || 0) + '</b> con · 🟤 Cám: <b>' +
-    (S.store.cam || 0) + '</b> viên' +
-    FOODS.map(f => ' · ' + f.icon + ' ' + f.name + ': <b>' + (((S.store.food || {})[f.id] || 0)) + '</b>').join('') +
-    ' · 🎣 Cần: <b>' + S.store.rods.length + '</b> cây';
+  // --- Kho ở nhà (chỉ liệt kê món đang có) ---
+  const sp = [];
+  if ((S.store.giun || 0) > 0) sp.push('🪱 Giun: <b>' + S.store.giun + '</b> con');
+  if ((S.store.cam || 0) > 0) sp.push('🟤 Cám: <b>' + S.store.cam + '</b> viên');
+  for (const f of FOODS) { const q = ((S.store.food || {})[f.id] || 0); if (q > 0) sp.push(f.icon + ' ' + f.name + ': <b>' + q + '</b>'); }
+  if (S.store.rods.length > 0) sp.push('🎣 Cần: <b>' + S.store.rods.length + '</b> cây');
+  $('store-summary').innerHTML = sp.length ? sp.join(' · ') : 'Kho trống trơn — vào Cửa hàng sắm đồ đi câu nào! 🎣';
   // --- Mồi đang chọn (lấy trong túi) ---
   $('bait-giun-count').textContent = 'x' + (S.bag.giun || 0);
   $('bait-cam-count').textContent = 'x' + (S.bag.cam || 0);
+  $('cam-desc').textContent = fmt(CAM_PRICE) + ' / gói ' + CAM_PACK + ' viên — cá cắn nhanh hơn';
+  $('btn-buy-cam-prep').textContent = 'Mua ' + fmt(CAM_PRICE);
+  $('btn-buy-cam-prep').disabled = (S.money || 0) < CAM_PRICE;
   $('card-giun').classList.toggle('selected', S.bait === 'giun');
   $('card-cam').classList.toggle('selected', S.bait === 'cam');
   const hasBait = (S.bait === 'giun' && (S.bag.giun || 0) > 0) || (S.bait === 'cam' && (S.bag.cam || 0) > 0);
