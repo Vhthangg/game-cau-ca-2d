@@ -512,3 +512,10 @@ body.is-portrait #pop-result .panel { max-width: 100%; }
   animation: pulse-danger 1s infinite; }
 @keyframes pulse-danger { 50% { filter: brightness(1.25); } }
 #hud-container.hot { background: rgba(198, 40, 40, .9); border-color: #ff8a80; }
+
+/* --- Realism pack: túi đi câu + tình trạng cần --- */
+.bag-step { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.bag-step b { min-width: 70px; text-align: center; font-size: var(--fs-body); }
+.spec-line { font-style: italic; color: var(--earth-700); font-size: var(--fs-caption); }
+.condbar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+.condbar i { display: block; height: 100%; border-radius: 4px; transition: width .3s ease, background-color .3s ease; }

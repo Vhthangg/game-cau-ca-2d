@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Câu Cá Ao Làng</title>
-<link rel="stylesheet" href="style.css?v=20261007c">
+<link rel="stylesheet" href="style.css?v=20261007d">
 </head>
 <body>
 <div id="wrap">
@@ -18,6 +18,7 @@
     <span id="hud-giun" class="pill">🪱 0</span>
     <span id="hud-cam" class="pill">🟤 0</span>
     <span id="hud-rod" class="pill">🎣 Cần tre</span>
+    <button id="btn-rod-switch" class="icon-btn hidden" title="Đổi cần dự phòng">🔄</button>
     <span id="hud-clock" class="pill hidden">🕐 15:00</span>
     <span id="hud-susp" class="pill hidden">😒 0</span>
     <span id="hud-container" class="pill hidden">🪣 0/5</span>
@@ -115,8 +116,12 @@
     <div id="scr-prepare" class="screen hidden">
       <div class="panel wide">
         <h2>🎒 Chuẩn bị đồ câu <span id="prep-money" class="money-line">💰 0đ</span></h2>
-        <h3>Chọn cần</h3>
-        <div id="rod-list" class="cards"></div>
+        <h3>🎒 Túi đi câu <small>(tối đa 2 cần — chạm thẻ cần để cho vào / bỏ ra)</small></h3>
+        <div id="bag-rods" class="cards"></div>
+        <h3>🎒 Mồi & đồ ăn mang theo <small>(giới hạn nắp túi)</small></h3>
+        <div id="bag-items" class="cards"></div>
+        <h3>🏠 Kho ở nhà <small>(không giới hạn)</small></h3>
+        <div id="store-summary" class="week-card"></div>
         <h3>Chọn mồi <small>(mồi dùng để câu)</small></h3>
         <div class="cards">
           <div class="card" id="card-giun">
@@ -293,9 +298,9 @@
   </div>
 </div>
 
-<script src="js/config.js?v=20261007c"></script>
-<script src="js/audio.js?v=20261007c"></script>
-<script src="js/art.js?v=20261007c"></script>
-<script src="js/game.js?v=20261007c"></script>
+<script src="js/config.js?v=20261007d"></script>
+<script src="js/audio.js?v=20261007d"></script>
+<script src="js/art.js?v=20261007d"></script>
+<script src="js/game.js?v=20261007d"></script>
 </body>
 </html>
