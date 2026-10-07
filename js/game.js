@@ -95,7 +95,7 @@ if (S.wifeGiven == null) S.wifeGiven = 0;
 if (S.biggestFishName == null) S.biggestFishName = '';
 if (!S.statDay || typeof S.statDay !== 'object') S.statDay = null;
 if (!S.statWeek || typeof S.statWeek !== 'object') S.statWeek = null;
-regenStamina(); // hồi thể lực theo thời gian thực kể từ lần chơi trước
+// (regenStamina() được gọi ở cuối file, trước enterMenu — gọi sớm sẽ crash TDZ vì let phase/session khai báo sau)
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
 /* ---------- Kho ở nhà + Túi đi câu + Độ bền cần ---------- */
 function migrateStoreBag() {
@@ -419,7 +419,7 @@ let lastClockMin = -1;        // phút game đã hiển thị trên HUD (tránh 
 let lastTidePhase = '';         // pha thủy triều đã hiển thị (đầm phá)
 
 /* ---------- DOM helper ---------- */
-const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-dig', 'pop-result', 'scr-map', 'scr-quest',
+const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-guide', 'scr-dig', 'pop-result', 'scr-map', 'scr-quest',
   'scr-call', 'scr-wifehome', 'scr-kitchen', 'scr-leaderboard', 'scr-name', 'scr-container', 'scr-food'];
 function show(id) {
   screens.forEach(s => $(s).classList.toggle('hidden', s !== id));
@@ -534,6 +534,25 @@ function updateHUD() {
 /* ---------- Màn hình ---------- */
 function enterMenu() { phase = 'MENU'; trip = null; S.mode = S.mode || 'free'; show('scr-menu'); ensureDailyQuests(); ensureWeekly(); updateHUD(); }
 function enterHelp() { phase = 'HELP'; show('scr-help'); }
+/* ---------- 📖 Cẩm nang câu cá ---------- */
+function enterGuide() { phase = 'GUIDE'; show('scr-guide'); renderGuideList(); }
+function renderGuideList() {
+  $('guide-list').classList.remove('hidden');
+  $('guide-detail').classList.add('hidden');
+  $('guide-list').innerHTML = GUIDE_TOPICS.map(t =>
+    '<div class="card guide-card" data-guide="' + t.id + '">' +
+    '<div class="guide-card-icon">' + t.icon + '</div>' +
+    '<div class="card-title">' + t.title + '</div></div>').join('');
+}
+function openGuideTopic(id) {
+  const t = GUIDE_TOPICS.find(x => x.id === id);
+  if (!t) return;
+  $('guide-list').classList.add('hidden');
+  $('guide-detail').classList.remove('hidden');
+  $('guide-detail-title').textContent = t.icon + ' ' + t.title;
+  $('guide-detail-body').innerHTML = t.body;
+  $('scr-guide').scrollTop = 0;
+}
 function enterShop() { phase = 'SHOP'; show('scr-shop'); renderShop(); }
 
 /* ---------- Đợt 2: Chọn chế độ & bắt đầu chuyến trốn vợ ---------- */
@@ -1689,6 +1708,9 @@ bindClick('btn-rod-switch', () => switchRod());
 bindClick('btn-to-shop', enterShop);
 bindClick('btn-to-help', enterHelp);
 bindClick('btn-help-back', enterMenu);
+bindClick('btn-to-guide', enterGuide);
+bindClick('btn-guide-back', enterGuide);
+bindClick('btn-guide-close', enterMenu);
 bindClick('btn-prep-back', enterMenu);
 bindClick('btn-shop-back', enterMenu);
 bindClick('btn-quest-back', enterMenu);
@@ -1875,6 +1897,9 @@ document.addEventListener('click', e => {
   if (gf) { Sfx.init(); Sfx.click(); buyWifeGift(gf.dataset.gift); return; }
   const br = e.target.closest('[data-bribe]');
   if (br) { Sfx.init(); Sfx.click(); buyBribe(br.dataset.bribe); return; }
+  // 📖 Cẩm nang câu cá (thẻ chủ đề — không thuộc REPEAT_ACTS nên ấn-giữ không ảnh hưởng)
+  const gd = e.target.closest('[data-guide]');
+  if (gd) { Sfx.init(); Sfx.click(); openGuideTopic(gd.dataset.guide); return; }
   // Chọn đồ đựng cá mang theo (màn hình chuẩn bị, mode Trốn vợ)
   const dc = e.target.closest('[data-cont]');
   if (dc && S.containers.includes(dc.dataset.cont)) {
@@ -2566,6 +2591,7 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
   };
 }
 
+regenStamina(); // hồi thể lực theo thời gian thực kể từ lần chơi trước (đặt đây để let phase/session đã khởi tạo xong)
 enterMenu();
 updateLayout(); // chốt logical size canvas + body.is-portrait trước frame đầu
 requestAnimationFrame(loop);
