@@ -4,18 +4,24 @@
 // Cần: cast = tầm quăng (0..1), sense = độ nhạy cắn (0..1), line = độ bền dây (0..1)
 // type: 'dai' | 'may' — dòng cần. reqLevel: cấp cần thủ tối thiểu để mua.
 const RODS = [
-  { id: 'tre',       name: 'Cần tre',       type: 'dai', price: 0,    cast: 0.55, sense: 0.30, line: 0.40, reqLevel: 1,
-    desc: 'Cần tre truyền thống. Quăng gần, tín hiệu mờ.' },
-  { id: 'truc',      name: 'Cần trúc',      type: 'dai', price: 250000,   cast: 0.66, sense: 0.44, line: 0.54, reqLevel: 1,
-    desc: 'Nhẹ và dẻo hơn tre, quăng xa hơn.' },
-  { id: 'composite', name: 'Cần composite', type: 'dai', price: 1000000,  cast: 0.80, sense: 0.60, line: 0.70, reqLevel: 1,
-    desc: 'Cứng cáp, tín hiệu cắn rõ ràng.' },
-  { id: 'carbon',    name: 'Cần carbon',    type: 'dai', price: 6000000, cast: 0.97, sense: 0.80, line: 0.92, reqLevel: 1,
-    desc: 'Hàng xịn của đại lão. Quăng xa, nhạy, khỏe.' },
-  { id: 'may24',     name: 'Cần máy 2.4m',  type: 'may', price: 2500000,  cast: 0.85, sense: 0.60, line: 0.75, reqLevel: 2,
-    desc: 'Cần spinning đa năng. Quăng xa, khỏe, hợp câu sông.' },
-  { id: 'may30',     name: 'Cần máy 3.0m bạo lực', type: 'may', price: 15000000, cast: 0.95, sense: 0.40, line: 0.95, reqLevel: 8,
-    desc: 'Hàng săn cá khủng. Rất cứng rất khỏe, hơi kém nhạy.' },
+  { id: 'tre',       name: 'Cần tre làng',   type: 'dai', price: 0,    cast: 0.55, sense: 0.30, line: 0.40, reqLevel: 1,
+    spec: '3.6m · tre tự nhiên · 1 khúc · ~150g',
+    desc: 'Cần tre truyền thống của làng. Quăng gần, tín hiệu mờ — nhưng gãy là bố cho cây mới!' },
+  { id: 'truc',      name: 'Cần trúc 4.5m',  type: 'dai', price: 250000,   cast: 0.66, sense: 0.44, line: 0.54, reqLevel: 1,
+    spec: '4.5m · trúc tự nhiên · 3 lóng · ~180g',
+    desc: 'Nhẹ và dẻo hơn tre, quăng xa hơn. Hàng thủ công phơi nắng.' },
+  { id: 'composite', name: 'Cần tay composite 5.4m 5H', type: 'dai', price: 1000000, cast: 0.80, sense: 0.60, line: 0.70, reqLevel: 1,
+    spec: '5.4m · 5H · 5 lóng · ~230g · composite',
+    desc: 'Cứng 5H lên cá nhanh, hợp cả ao lẫn sông. Ngọn chống nổ.' },
+  { id: 'carbon',    name: 'Handing Điếu Vương 6H 5.4m', type: 'dai', price: 6000000, cast: 0.97, sense: 0.80, line: 0.92, reqLevel: 1,
+    spec: '5.4m · 6H · 5 lóng · 198g · carbon',
+    desc: 'Hàng Handing chính hãng: nhẹ, nảy, tải tĩnh khỏe. Đẳng cấp cần thủ đài.' },
+  { id: 'may24',     name: 'Daiwa Crossfire 2.4m', type: 'may', price: 2500000,  cast: 0.85, sense: 0.60, line: 0.75, reqLevel: 2,
+    spec: '2.4m · spinning 2 khúc · carbon',
+    desc: 'Cần máy Daiwa đa năng. Quăng xa, khỏe, hợp câu sông.' },
+  { id: 'may30',     name: 'Shimano Bass One XT 3.0m', type: 'may', price: 15000000, cast: 0.95, sense: 0.40, line: 0.95, reqLevel: 8,
+    spec: '3.0m · spinning · săn hàng',
+    desc: 'Hàng Shimano săn cá khủng. Rất cứng rất khỏe, hơi kém nhạy.' },
 ];
 
 // pattern cắn: nhap2 | nhap3 | nhap1 | chimcham | day | dotngot | rung | loi
@@ -82,13 +88,28 @@ function mapName(id) { const m = MAPS.find(m => m.id === id); return m ? m.icon 
 
 // Điểm câu ở sông quê: flow = độ xiết dòng (0..1)
 const RIVER_SPOTS = [
-  { id: 'bendo',  name: 'Bến đò',  x: 200, y: 335, flow: 0.2, desc: 'Nước nông 1–2m, dòng êm — dễ câu.',
-    fish: ['ro-phi', 'thac-lac', 'ca-he'] },
-  { id: 'gamcau', name: 'Gầm cầu', x: 480, y: 305, flow: 0.5, desc: 'Hố sâu 4–6m, nước quẩn — cá to trú.',
-    fish: ['tre-fish', 'nganh', 'lang-song'] },
-  { id: 'baiboi', name: 'Bãi bồi', x: 760, y: 350, flow: 0.8, desc: 'Dòng xiết, đáy cát — thử thách!',
-    fish: ['basa', 'tra', 'bong-tuong', 'ca-chot'] },
+  { id: 'bendo',  name: 'Bến đò',  x: 200, y: 335, px: 120, py: 400, flow: 0.2,
+    desc: 'Nước nông 1–2m, dòng êm — dễ câu.',
+    fish: ['ro-phi', 'thac-lac', 'ca-he'],
+    // Layout scene khi đã chọn điểm: vị trí chân cần thủ + vùng nước quăng được
+    ax: 150, ay: 498, pax: 120, pay: 912,
+    wx: [200, 900], wy: [230, 430], pwx: [40, 500], pwy: [210, 700],
+    decor: 'bendo' },
+  { id: 'gamcau', name: 'Gầm cầu', x: 480, y: 305, px: 270, py: 380, flow: 0.5,
+    desc: 'Hố sâu 4–6m, nước quẩn — cá to trú.',
+    fish: ['tre-fish', 'nganh', 'lang-song'],
+    ax: 470, ay: 498, pax: 270, pay: 912,
+    wx: [60, 900], wy: [230, 430], pwx: [40, 500], pwy: [210, 700],
+    decor: 'gamcau' },
+  { id: 'baiboi', name: 'Bãi bồi', x: 760, y: 350, px: 420, py: 420, flow: 0.8,
+    desc: 'Dòng xiết, đáy cát — thử thách!',
+    fish: ['basa', 'tra', 'bong-tuong', 'ca-chot'],
+    ax: 790, ay: 498, pax: 420, pay: 912,
+    wx: [60, 760], wy: [230, 430], pwx: [40, 500], pwy: [210, 700],
+    decor: 'baiboi' },
 ];
+// Túi đi câu: 2 ngăn cần (kiểu túi Rice Fishing TC-23) + giới hạn mồi/đồ ăn
+const BAG_CAPS = { rods: 2, giun: 30, camGoi: 10, foodEach: 3 };
 function spotById(id) { return RIVER_SPOTS.find(s => s.id === id); }
 
 // Nhiệm vụ ngày: type — catch_any | catch_species | big_fish | use_baits | spots | catch_map | sell | streak
