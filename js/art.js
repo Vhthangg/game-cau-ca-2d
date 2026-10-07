@@ -242,6 +242,42 @@ const Art = (function () {
     if (M.mood === 'night') { ctx.fillStyle = 'rgba(8,18,38,.34)'; ctx.fillRect(0, 0, W, H); }
     else if (M.mood === 'dusk') { ctx.fillStyle = 'rgba(50,25,60,.14)'; ctx.fillRect(0, 0, W, H); }
   }
+  // Bóng đổ theo mood: dài xiên lúc bình minh/hoàng hôn, ngắn lúc trưa, mờ lúc đêm
+  // x,y: điểm chân vật thể; w: bề rộng vật thể
+  function drawGroundShadow(ctx, x, y, w, mood) {
+    let len, alpha, dx;
+    if (mood === 'night') { len = w * 0.7; alpha = 0.13; dx = 0; }
+    else if (mood === 'dawn') { len = w * 2.6; alpha = 0.20; dx = -w * 1.5; }
+    else if (mood === 'golden' || mood === 'dusk') { len = w * 2.6; alpha = 0.20; dx = w * 1.5; }
+    else { len = w * 0.9; alpha = 0.24; dx = w * 0.3; } // day
+    ctx.save();
+    ctx.translate(x + dx, y); ctx.scale(1, 0.26);
+    ctx.fillStyle = 'rgba(12,22,18,' + alpha + ')';
+    ctx.beginPath(); ctx.ellipse(0, 0, len / 2, w / 2, 0, 0, 6.29); ctx.fill();
+    ctx.restore();
+  }
+  // Mưa: sợi mưa xiên theo gió + gợn sóng chỗ chạm mặt nước (thuần hàm của t, không cần state)
+  // wy,wh: vùng mặt nước để vẽ gợn
+  function drawRain(ctx, t, W, H, wy, wh) {
+    const N = 70, spd = 640, len = 26;
+    ctx.strokeStyle = 'rgba(200,220,240,.42)'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < N; i++) {
+      const x = ((i * 97.3) % (W + 80)) - 40 + Math.sin(t * 0.8 + i) * 6;
+      const y = ((i * 53.7 + t * spd) % (H + 60)) - 30;
+      ctx.moveTo(x, y); ctx.lineTo(x - 6, y + len);
+    }
+    ctx.stroke();
+    const NR = 22;
+    for (let i = 0; i < NR; i++) {
+      const rx = ((i * 173.3) % W);
+      const ry = wy + ((i * 61.7) % Math.max(1, wh));
+      const pr = ((t * 1.8 + i * 0.37) % 1);
+      ctx.strokeStyle = 'rgba(255,255,255,' + (0.38 * (1 - pr)).toFixed(2) + ')';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(rx, ry, 4 + pr * 16, 2 + pr * 7, 0, 0, 6.29); ctx.stroke();
+    }
+  }
 
   function drawBamboo(ctx, bx, by, h, lean) {
     // bx,by: gốc; h: chiều cao; lean: độ nghiêng
@@ -571,8 +607,13 @@ const Art = (function () {
     else drawDecoBucket(ctx, 690, 492);
     // cần thủ đứng trên bờ ao
     if (v.angler) drawAnglerLand(ctx, v.angler.x, v.angler.y);
+    // bóng đổ theo giờ (mặt trời/mặt trăng)
+    if (v.angler) drawGroundShadow(ctx, v.angler.x, v.angler.y + 4, 46, sky.mood);
+    if (v.container) drawGroundShadow(ctx, v.container.x, v.container.y + 6, 44, sky.mood);
+    else drawGroundShadow(ctx, 690, 500, 30, sky.mood);
 
     dimForMood(ctx, W, H, sky);
+    if (sky.wet) drawRain(ctx, t, W, H, 202, 263);
     drawOverlay(ctx, t, v);
   }
 
@@ -628,6 +669,10 @@ const Art = (function () {
     else drawDecoBucket(ctx, 690, 492);
     // --- Cần thủ đứng đúng điểm đã chọn ---
     if (v.angler && decor !== 'overview') drawAnglerLand(ctx, v.angler.x, v.angler.y);
+    // bóng đổ theo giờ
+    if (v.angler && decor !== 'overview') drawGroundShadow(ctx, v.angler.x, v.angler.y + 4, 46, sky.mood);
+    if (v.container) drawGroundShadow(ctx, v.container.x, v.container.y + 6, 44, sky.mood);
+    else drawGroundShadow(ctx, 690, 500, 30, sky.mood);
     // --- Điểm câu (phase chọn điểm): tên + mô tả + gợi ý cá ---
     (v.spots || []).forEach(s => {
       const pr = (t * 1.6) % 1;
@@ -655,6 +700,7 @@ const Art = (function () {
     if (v.spotHint) pill(ctx, v.spotHint, 480, 60);
 
     dimForMood(ctx, W, H, sky);
+    if (sky.wet) drawRain(ctx, t, W, H, 190, 260);
     drawOverlay(ctx, t, v);
   }
 
@@ -840,8 +886,13 @@ const Art = (function () {
     // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
     if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y, v.container.load);
     else drawDecoBucket(ctx, 420, 868);
+    // bóng đổ theo giờ
+    drawGroundShadow(ctx, v.angler ? v.angler.x : 150, (v.angler ? v.angler.y : 915) + 4, 46, sky.mood);
+    if (v.container) drawGroundShadow(ctx, v.container.x, v.container.y + 6, 44, sky.mood);
+    else drawGroundShadow(ctx, 420, 876, 30, sky.mood);
 
     dimForMood(ctx, W, H, sky);
+    if (sky.wet) drawRain(ctx, t, W, H, 200, 525);
     drawOverlay(ctx, t, v);
   }
 
@@ -925,6 +976,16 @@ const Art = (function () {
     (v.splashes || []).forEach(p => {
       ctx.strokeStyle = 'rgba(255,255,255,' + p.a + ')'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+    });
+    // --- Giọt nước bắn lên (có trọng lực, giới hạn số lượng ở game.js) ---
+    (v.drops || []).forEach(p => {
+      ctx.fillStyle = 'rgba(215,238,255,' + Math.max(0, Math.min(0.9, p.a)).toFixed(2) + ')';
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r, p.r * 1.6, 0, 0, 6.29); ctx.fill();
+    });
+    // --- Gợn sóng lan rộng (mồi chạm nước, quanh phao, mưa) ---
+    (v.ripples || []).forEach(p => {
+      ctx.strokeStyle = 'rgba(255,255,255,' + (p.a * 0.55).toFixed(2) + ')'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r, p.r * 0.45, 0, 0, 6.29); ctx.stroke();
     });
 
     // --- Goi y quang can ---
