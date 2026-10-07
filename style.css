@@ -244,6 +244,19 @@ html, body {
 #res-fish { background: #e3f2fd; border-radius: 10px; margin: 6px 0; }
 .green { color: var(--brand-600); font-weight: bold; }
 .help ol { text-align: left; font-size: 15px; line-height: 1.65; }
+/* ---------- 📖 Cẩm nang câu cá ---------- */
+.guide-card { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 12px; }
+.guide-card:hover { border-color: var(--brand-500); background: var(--brand-100); }
+.guide-card:active { transform: scale(.98); }
+.guide-card-icon { font-size: 28px; line-height: 1; flex-shrink: 0; }
+.guide-card .card-title { margin: 0; font-size: 15px; }
+.guide-body { text-align: left; font-size: 15px; line-height: 1.7; }
+.guide-body h3 { margin: 14px 0 6px; font-size: 16px; color: var(--brand-700); }
+.guide-body h3:first-child { margin-top: 0; }
+.guide-body p { margin: 6px 0; }
+.guide-body ul { margin: 6px 0; padding-left: 20px; }
+.guide-body li { margin: 4px 0; }
+#guide-detail-title { margin: 4px 0 10px; }
 
 /* ---- Toast ---- */
 #toast {
