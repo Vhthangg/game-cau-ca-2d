@@ -962,7 +962,9 @@ function enterDig(fromShop) {
   $('dig-left').textContent = 'Lượt đào còn lại hôm nay: ' + digsLeft() + '/' + DIG.perDay;
   phase = 'DIG'; show('scr-dig');
   $('dig-from-shop').value = fromShop ? '1' : '';
-  digS = { dug: 0, timeLeft: DIG.time, worms: [], hoes: [], parts: [], marks: [], decor: makeDigDecor() };
+  let decor = { dots: [], pebbles: [], weeds: [], mounds: [] };
+  try { decor = makeDigDecor(); } catch (e) { decor = { dots: [], pebbles: [], weeds: [], mounds: [] }; }
+  digS = { dug: 0, timeLeft: DIG.time, worms: [], hoes: [], parts: [], marks: [], decor: decor };
   $('dig-time').textContent = digS.timeLeft; $('dig-count').textContent = digS.dug;
   const pop = setInterval(digSpawn, DIG.popMs);
   const tick = setInterval(() => {
@@ -2116,11 +2118,17 @@ function render() {
   const skyM = Art.moodFor(_nd.getHours() + _nd.getMinutes() / 60, session.golden, session.weather);
   // Mini-game đào giun: vẽ vườn đất trên canvas chính
   if (phase === 'DIG' && digS) {
-    Art.drawDigGarden(ctx, {
-      W: L.W, H: L.H, t: tG, sky: skyM,
-      worms: digS.worms, hoes: digS.hoes, parts: digS.parts, marks: digS.marks,
-      decor: digS.decor, bucket: digBucket(),
-    });
+    try {
+      Art.drawDigGarden(ctx, {
+        W: L.W, H: L.H, t: tG, sky: skyM,
+        worms: digS.worms, hoes: digS.hoes, parts: digS.parts, marks: digS.marks,
+        decor: digS.decor, bucket: digBucket(),
+      });
+    } catch (e) {
+      // Fallback: nền đất đơn giản để không bao giờ màn hình trống
+      ctx.fillStyle = '#9c7a5f'; ctx.fillRect(0, 0, L.W, L.H);
+      for (const w of digS.worms) { const h = Art.wormHead(w, tG); ctx.fillStyle = '#e78a9b'; ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, 6.29); ctx.fill(); }
+    }
     return;
   }
   // vị trí phao theo phase
@@ -2173,8 +2181,13 @@ function render() {
 function loop(ts) {
   const dt = Math.min((ts - lastTs) / 1000 || 0, 0.05);
   lastTs = ts; tG += dt;
-  update(dt);
-  render();
+  try {
+    update(dt);
+    render();
+  } catch (err) {
+    // Không bao giờ để 1 lỗi vẽ/logic làm chết vòng lặp game (màn hình đen)
+    if (!loop._errLogged) { loop._errLogged = true; try { console.error('[game] loop error:', err); } catch (e) {} }
+  }
   updateActionBar(); // đồng bộ cụm nút portrait theo phase (có cache, rẻ)
   // Thể lực hồi dần theo thời gian thực kể cả khi đang mở game
   stamRegenT += dt;
