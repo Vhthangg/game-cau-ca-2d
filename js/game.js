@@ -58,7 +58,7 @@ function defaultSave() {
   return { money: START_MONEY, bait: 'giun',
            // Kho ở nhà (không giới hạn) + Túi đi câu (giới hạn theo BAG_CAPS)
            store: null, bag: null, rodSeq: 1,
-           muted: false, totalFish: 0, caughtAo: 0, map: 'ao', quests: null, mode: 'free',
+           muted: false, totalFish: 0, caughtAo: 0, caughtSong: 0, map: 'ao', quests: null, mode: 'free',
            // Đợt 2: Trốn vợ đi câu
            suspicion: 0, sincerity: 0, happiness: 0, merit: 0, totalMerit: 0, buffUntil: 0,
            banUntil: '', spendDay: null, basket: [], weekEntries: {}, weekEval: '',
@@ -117,6 +117,11 @@ function migrateStoreBag() {
   }
   // Dọn field cũ (đã chuyển vào store)
   delete S.rods; delete S.rod; delete S.giun; delete S.cam; delete S.food;
+  // Trụ 2: vá mồi cao cấp cho save cũ (không mất đồ đang có)
+  ['moiU', 'deChui', 'lure'].forEach(k => {
+    if (S.store[k] == null) S.store[k] = 0;
+    if (S.bag[k] == null) S.bag[k] = 0;
+  });
   save();
 }
 function rodInst(iid) { return (S.store.rods || []).find(r => r.iid === iid); }
@@ -205,10 +210,14 @@ function bagStep(kind, d) { // kind: 'giun' (±1) | 'camGoi' (±1 gói = CAM_PAC
     const cur = S.bag.giun || 0, avail = (S.store.giun || 0) + cur;
     const nv = Math.max(0, Math.min(BAG_CAPS.giun, avail, cur + d));
     S.bag.giun = nv; S.store.giun -= (nv - cur);
-  } else {
+  } else if (kind === 'camGoi') {
     const cur = S.bag.cam || 0, avail = (S.store.cam || 0) + cur;
     const nv = Math.max(0, Math.min(BAG_CAPS.camGoi * CAM_PACK, avail, cur + d * CAM_PACK));
     S.bag.cam = nv; S.store.cam -= (nv - cur);
+  } else { // Trụ 2: 'moiU' | 'deChui' | 'lure' (±1 đơn vị)
+    const cur = S.bag[kind] || 0, avail = (S.store[kind] || 0) + cur;
+    const nv = Math.max(0, Math.min(BAG_CAPS[kind], avail, cur + d));
+    S.bag[kind] = nv; S.store[kind] = (S.store[kind] || 0) - (nv - cur);
   }
   save(); Sfx.click(); renderPrepare();
 }
@@ -230,6 +239,9 @@ function bagStepper(kind, icon, name, bq, bmax, unit, storeQ) {
 function returnBagToStore() {
   S.store.giun += S.bag.giun || 0; S.bag.giun = 0;
   S.store.cam += S.bag.cam || 0; S.bag.cam = 0;
+  ['moiU', 'deChui', 'lure'].forEach(k => { // Trụ 2: mồi cao cấp
+    S.store[k] = (S.store[k] || 0) + (S.bag[k] || 0); S.bag[k] = 0;
+  });
   S.store.food = S.store.food || {}; S.bag.food = S.bag.food || {};
   for (const f of FOODS) { S.store.food[f.id] = (S.store.food[f.id] || 0) + (S.bag.food[f.id] || 0); S.bag.food[f.id] = 0; }
   save();
@@ -292,6 +304,7 @@ function stamFillColor(v) { return v > 50 ? '#66bb6a' : (v > STAMINA.warnAt ? '#
 function mapUnlocked(id) {
   if (id === 'ao') return true;
   if (id === 'song') return S.wifeApproved || (S.caughtAo || 0) >= 15 || level() >= 2;
+  if (id === 'dampha') return level() >= 6 || (S.caughtSong || 0) >= 25;
   return false;
 }
 Sfx.muted = !!S.muted;
@@ -352,6 +365,22 @@ function fmtClock(mins) {
   return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
 }
 
+/* ---------- Thủy triều ở đầm phá (Trụ 2) ----------
+   Chu kỳ ~6h giờ game (1m thực = 15m game → 0.25 phút game/giây thực).
+   Nước lớn: cá cắn mạnh hơn (+25%, trừ cua biển). Nước ròng: cắn kém (−20%)
+   nhưng cua biển +15% và dễ gặp hơn. */
+function gameMinNow() {
+  if (S.mode === 'wife' && trip) return trip.gameMin;
+  return Date.now() / 4000;
+}
+// → { phase: 'len'|'dung'|'rong', name, icon, bite: hệ số nhân wait, level: 0..1 mực nước }
+function tideState() {
+  const c = (((gameMinNow() % 360) + 360) % 360); // 360 phút game / chu kỳ
+  if (c < 140) return { phase: 'len',  name: 'Nước lớn',  icon: '🌊', bite: 0.8, level: c / 140 };
+  if (c < 180) return { phase: 'dung', name: 'Nước đứng', icon: '🌀', bite: 1,   level: 1 };
+  if (c < 320) return { phase: 'rong', name: 'Nước ròng', icon: '🏖️', bite: 1.2,  level: 1 - (c - 180) / 140 };
+  return { phase: 'dung', name: 'Nước đứng', icon: '🌀', bite: 1, level: 0 };
+}
 /* ---------- Trạng thái game ---------- */
 let phase = 'MENU';           // MENU PREPARE SHOP HELP DIG CAST WAIT BITE STRIKE FIGHT RESULT
 let tG = 0, lastTs = 0;       // thời gian toàn cục
@@ -381,6 +410,7 @@ let trip = null;              // Đợt 2: chuyến "trốn vợ" — {gameMin, 
 let homeConfirmT = 0;         // đếm ngược xác nhận "về nhà" khi quá giờ
 let riskT = 0, overWarned = false, contShakeT = 0; // rủi ro đồ đựng: roll định kỳ, cảnh báo quá tải, rung rọng
 let lastClockMin = -1;        // phút game đã hiển thị trên HUD (tránh ghi DOM mỗi frame)
+let lastTidePhase = '';         // pha thủy triều đã hiển thị (đầm phá)
 
 /* ---------- DOM helper ---------- */
 const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-dig', 'pop-result', 'scr-map', 'scr-quest',
@@ -411,12 +441,19 @@ function toast(msg, ms) {
 function updateHUD() {
   $('hud-money').textContent = '💰 ' + fmt(S.money);
   $('hud-level').textContent = '⭐ Cấp ' + level();
-  $('hud-map').textContent = mapName(S.map);
+  $('hud-map').textContent = S.map === 'dampha' ? '🦀 Đầm phá' : mapName(S.map);
   const w = $('hud-weather');
   if (isFishing()) {
     w.classList.remove('hidden');
     w.textContent = (session.weather === 'mua' ? '🌧️ Vừa mưa' : '☀️ Nắng') + (session.golden ? ' ⚡ Giờ vàng' : '');
   } else w.classList.add('hidden');
+  // Chip thủy triều (chỉ ở đầm phá lúc đang câu)
+  const td = $('hud-tide');
+  if (isFishing() && S.map === 'dampha') {
+    td.classList.remove('hidden');
+    const ts = tideState();
+    td.textContent = ts.icon + ' ' + ts.name;
+  } else td.classList.add('hidden');
   $('hud-giun').textContent = '🪱 ' + inv().giun;
   $('hud-cam').textContent = '🟤 ' + (inv().cam || 0);
   (function () {
@@ -527,7 +564,7 @@ function renderMapSelect() {
       '<span class="map-icon">' + (un ? m.icon : '🔒') + '</span>' +
       '<div class="card-title">' + m.name + '</div>' +
       '<div class="card-desc">' + m.desc + '</div>' +
-      (un ? '' : '<div class="lock-line">🔒 Mở khóa: câu 15 con ở ao làng hoặc đạt cấp 2</div>') +
+      (un ? '' : '<div class="lock-line">' + mapLockText(m.id) + '</div>') +
       '</div>';
   }).join('');
 }
@@ -542,7 +579,7 @@ function enterFish(mapId) {
   session.golden = isGoldenHour();
   if (session.weather === 'mua') setTimeout(() => toast('🌧️ Trời vừa tạnh mưa — cá đang ăn mạnh!'), 600);
   if (session.golden) setTimeout(() => toast('⚡ Giờ vàng câu cá! Tỉ lệ cắn tăng.'), 1400);
-  if (mapId === 'song') {
+  if (mapId === 'song' || mapId === 'dampha') {
     phase = 'SPOT'; show(null); updateHUD();
     hint = 'Chạm vào 1 trong 3 điểm câu!';
   } else {
@@ -695,6 +732,18 @@ function renderPrepare() {
   if (giunHas) items += bagStepper('giun', '🪱', 'Giun đất', S.bag.giun || 0,
     Math.min(BAG_CAPS.giun, (S.store.giun || 0) + (S.bag.giun || 0)), 'con', (S.store.giun || 0) + ' con');
   if (camHas) items += bagStepper('camGoi', '🟤', 'Cám câu', camGoiBag, camGoiMax, 'gói', Math.floor((S.store.cam || 0) / CAM_PACK) + ' gói');
+  // Trụ 2: mồi cao cấp trong túi (chỉ hiện món đang sở hữu)
+  const premBag = [
+    { key: 'moiU',   icon: '🧪', name: 'Mồi ủ lên men',  unit: 'gói' },
+    { key: 'deChui', icon: '🦗', name: 'Dế chũi',        unit: 'con' },
+    { key: 'lure',   icon: '🐟', name: 'Mồi giả (lure)', unit: 'cái' },
+  ];
+  for (const p of premBag) {
+    if ((S.store[p.key] || 0) + (S.bag[p.key] || 0) <= 0) continue;
+    const bq = S.bag[p.key] || 0, sq = S.store[p.key] || 0;
+    const mx = Math.min(BAG_CAPS[p.key], sq + bq);
+    items += bagStepper(p.key, p.icon, p.name, bq, mx, p.unit, sq + ' ' + p.unit);
+  }
   for (const f of FOODS) {
     const bq = (S.bag.food || {})[f.id] || 0;
     const sq = ((S.store.food || {})[f.id] || 0);
@@ -712,24 +761,45 @@ function renderPrepare() {
   const sp = [];
   if ((S.store.giun || 0) > 0) sp.push('🪱 Giun: <b>' + S.store.giun + '</b> con');
   if ((S.store.cam || 0) > 0) sp.push('🟤 Cám: <b>' + S.store.cam + '</b> viên');
+  if ((S.store.moiU || 0) > 0) sp.push('🧪 Mồi ủ: <b>' + S.store.moiU + '</b> gói');
+  if ((S.store.deChui || 0) > 0) sp.push('🦗 Dế chũi: <b>' + S.store.deChui + '</b> con');
+  if ((S.store.lure || 0) > 0) sp.push('🐟 Lure: <b>' + S.store.lure + '</b> cái');
   for (const f of FOODS) { const q = ((S.store.food || {})[f.id] || 0); if (q > 0) sp.push(f.icon + ' ' + f.name + ': <b>' + q + '</b>'); }
   if (S.store.rods.length > 0) sp.push('🎣 Cần: <b>' + S.store.rods.length + '</b> cây');
   $('store-summary').innerHTML = sp.length ? sp.join(' · ') : 'Kho trống trơn — vào Cửa hàng sắm đồ đi câu nào! 🎣';
   // --- Mồi đang chọn (lấy trong túi) ---
+  // Lure cần cần máy: nếu đang chọn lure mà không còn cần máy trong túi → về giun
+  if (!baitUsable(S.bait)) { S.bait = 'giun'; save(); }
   $('bait-giun-count').textContent = 'x' + (S.bag.giun || 0);
   $('bait-cam-count').textContent = 'x' + (S.bag.cam || 0);
+  $('bait-mou-count').textContent = 'x' + (S.bag.moiU || 0);
+  $('bait-dechui-count').textContent = 'x' + (S.bag.deChui || 0);
+  $('bait-lure-count').textContent = 'x' + (S.bag.lure || 0);
   $('cam-desc').textContent = fmt(CAM_PRICE) + ' / gói ' + CAM_PACK + ' viên — cá cắn nhanh hơn';
   $('btn-buy-cam-prep').textContent = 'Mua ' + fmt(CAM_PRICE);
   $('btn-buy-cam-prep').disabled = (S.money || 0) < CAM_PRICE;
-  $('card-giun').classList.toggle('selected', S.bait === 'giun');
-  $('card-cam').classList.toggle('selected', S.bait === 'cam');
-  const hasBait = (S.bait === 'giun' && (S.bag.giun || 0) > 0) || (S.bait === 'cam' && (S.bag.cam || 0) > 0);
+  // Mồi cao cấp (Trụ 2)
+  $('mou-desc').textContent = fmt(MOIU_PRICE) + ' / gói — cá ăn cám (chép, diêu hồng...) mê mồi ủ +40%';
+  $('btn-buy-mou-prep').textContent = 'Mua ' + fmt(MOIU_PRICE);
+  $('btn-buy-mou-prep').disabled = (S.money || 0) < MOIU_PRICE;
+  $('dechui-desc').textContent = fmt(DECHUI_PRICE) + ' / con — cá săn mồi (trê, vược, chẽm...) +50%';
+  $('btn-buy-dechui-prep').textContent = 'Mua ' + fmt(DECHUI_PRICE);
+  $('btn-buy-dechui-prep').disabled = (S.money || 0) < DECHUI_PRICE;
+  $('lure-desc').textContent = fmt(LURE_PRICE) + ' / cái — dùng MÃI không hao, chỉ cần máy. Cá săn mồi +35%';
+  $('btn-buy-lure-prep').textContent = 'Mua ' + fmt(LURE_PRICE);
+  $('btn-buy-lure-prep').disabled = (S.money || 0) < LURE_PRICE ||
+    ((S.store.lure || 0) + (S.bag.lure || 0)) >= 1;
+  ['giun', 'cam', 'moi-u', 'de-chui', 'lure'].forEach(b => {
+    const card = $('card-' + (b === 'moi-u' ? 'mou' : (b === 'de-chui' ? 'dechui' : b)));
+    if (card) card.classList.toggle('selected', S.bait === b);
+  });
+  const baitOk = hasBait(S.bait) && baitUsable(S.bait);
   const hasRod = S.bag.rods.length > 0;
-  $('btn-go-fish').disabled = !hasBait || !hasRod;
+  $('btn-go-fish').disabled = !baitOk || !hasRod;
   const hintEl = $('prep-nobait-hint');
-  hintEl.classList.toggle('hidden', hasBait && hasRod);
+  hintEl.classList.toggle('hidden', baitOk && hasRod);
   hintEl.textContent = !hasRod ? '⚠️ Chưa cho cần vào túi! Chạm thẻ cần ở trên.'
-    : (!hasBait ? '⚠️ Hết mồi trong túi! Chỉnh số lượng ở trên hoặc đào thêm giun.' : '');
+    : (!baitOk ? '⚠️ Hết mồi trong túi! Chỉnh số lượng ở trên hoặc đào thêm giun.' : '');
   $('btn-dig').textContent = digLabel();
   $('btn-dig').disabled = digsLeft() <= 0 || (S.stamina || 0) <= 0;
   // Đồ đựng cá (chỉ mode Trốn vợ): chọn trong số đã sở hữu
@@ -759,7 +829,17 @@ function renderShop() {
     '<br><a href="#" class="aff-link" data-item="Cám câu">🛒 Mua ngoài đời</a></div>' +
     '<div class="card"><div class="card-title">🪱 Giun đất <span class="count">x' + S.store.giun + '</span></div>' +
     '<div class="card-desc">Miễn phí — tự tay đào mới có! Còn ' + digsLeft() + '/' + DIG.perDay + ' lượt hôm nay.</div>' +
-    '<button class="btn small" data-act="dig"' + (digsLeft() <= 0 || (S.stamina || 0) <= 0 ? ' disabled' : '') + '>' + digLabel() + '</button></div>';
+    '<button class="btn small" data-act="dig"' + (digsLeft() <= 0 || (S.stamina || 0) <= 0 ? ' disabled' : '') + '>' + digLabel() + '</button></div>' +
+    // Trụ 2: mồi cao cấp
+    '<div class="card"><div class="card-title">🧪 Mồi ủ lên men <span class="count">x' + (S.store.moiU || 0) + '</span></div>' +
+    '<div class="card-desc">' + fmt(MOIU_PRICE) + ' / gói — cá ăn cám (chép, diêu hồng, basa, tra...) cắn nhanh +40%.</div>' +
+    '<button class="btn small" data-act="buymou"' + (S.money < MOIU_PRICE ? ' disabled' : '') + '>Mua ' + fmt(MOIU_PRICE) + '</button></div>' +
+    '<div class="card"><div class="card-title">🦗 Dế chũi <span class="count">x' + (S.store.deChui || 0) + '</span></div>' +
+    '<div class="card-desc">' + fmt(DECHUI_PRICE) + ' / con — mồi sống thơm nức, cá săn mồi (trê, lóc, vược, chẽm...) +50%.</div>' +
+    '<button class="btn small" data-act="buydechui"' + (S.money < DECHUI_PRICE ? ' disabled' : '') + '>Mua ' + fmt(DECHUI_PRICE) + '</button></div>' +
+    '<div class="card"><div class="card-title">🐟 Mồi giả (lure) <span class="count">x' + ((S.store.lure || 0) + (S.bag.lure || 0)) + '</span></div>' +
+    '<div class="card-desc">' + fmt(LURE_PRICE) + ' / cái — dùng MÃI không hao! Chỉ dùng được với cần máy. Cá săn mồi +35%.</div>' +
+    '<button class="btn small" data-act="buylure"' + (S.money < LURE_PRICE || ((S.store.lure || 0) + (S.bag.lure || 0)) >= 1 ? ' disabled' : '') + '>Mua ' + fmt(LURE_PRICE) + '</button></div>';
   // Đồ đựng cá (mode Trốn vợ) — xô ghẻ mặc định đã có
   $('shop-containers').innerHTML = CONTAINERS.filter(c => c.price > 0).map(c => {
     const owned = S.containers.includes(c.id);
@@ -908,7 +988,7 @@ function enterCast(msg) {
   hint = msg || null;
 }
 function waterBounds(x, y) {
-  if (S.map === 'song' && spot) {
+  if ((S.map === 'song' || S.map === 'dampha') && spot) {
     const w = L.portrait ? spot.pwx : spot.wx, h = L.portrait ? spot.pwy : spot.wy;
     return x >= w[0] && x <= w[1] && y >= h[0] && y <= h[1];
   }
@@ -918,7 +998,7 @@ function waterBounds(x, y) {
 }
 // Vị trí chân cần thủ theo map/điểm (cần thủ ĐỨNG ĐÚNG điểm đã chọn)
 function anglerPos() {
-  if (S.map === 'song' && spot)
+  if ((S.map === 'song' || S.map === 'dampha') && spot)
     return L.portrait ? { x: spot.pax, y: spot.pay } : { x: spot.ax, y: spot.ay };
   return L.portrait ? { x: 150, y: 912 } : { x: 110, y: 530 };
 }
@@ -933,14 +1013,15 @@ function doCast(x, y) {
   Sfx.waterPlip(); // "bõm" khi mồi chạm nước
   splashes.push({ x: fx, y: fy, r: 6, a: 0.9 });
   ripples.push({ x: fx, y: fy, r: 8, a: 0.8 });
-  // Chọn sẵn con cá sẽ cắn để áp hệ số mồi ưa thích / thời tiết / giờ vàng / dòng chảy
+  // Chọn sẵn con cá sẽ cắn để áp hệ số mồi ưa thích / thời tiết / giờ vàng / dòng chảy / thủy triều
   fish = pickFish();
   let mult = 1;
   const mods = [];
-  if (fish.bait === S.bait) { mult *= 0.8; }
+  const bm = baitBiteMult(fish, S.bait);
+  if (bm < 1) { mult *= bm; mods.push(BAITS[S.bait].name); }
   if (session.weather === 'mua') { mult *= 0.7; mods.push('sau mưa'); }
   if (session.golden) { mult *= 0.8; mods.push('giờ vàng'); }
-  if (S.map === 'song' && spot) {
+  if ((S.map === 'song' || S.map === 'dampha') && spot) {
     const drift = spot.flow - BAITS[S.bait].w;
     if (drift > 0.25) {
       mult *= 1.67; // tỉ lệ cắn giảm ~40%
@@ -948,22 +1029,43 @@ function doCast(x, y) {
       toast('⚠️ Dòng xiết! Hãy dùng mồi nặng hơn hoặc đổi điểm câu.');
     }
   }
+  // Trụ 2: thủy triều ở đầm phá
+  if (S.map === 'dampha') {
+    const td = tideState();
+    let tm = td.bite;
+    if (td.phase === 'len' && fish.id === 'cua') tm = 1;        // cua không hưởng nước lớn
+    else if (td.phase === 'rong' && fish.id === 'cua') tm = 0.87; // cua +15% lúc nước ròng
+    if (tm !== 1) { mult *= tm; mods.push(td.icon + ' ' + td.name); }
+  }
   const wt = BAITS[S.bait].wait;
   waitT = rnd(wt[0], wt[1]) * mult;
   phase = 'WAIT';
   wearRod(1); // quăng cần -1 độ bền
 }
 
+// Hệ số mồi ưa thích: hệ số nhân thời gian chờ cắn (nhỏ hơn = cắn nhanh hơn).
+// +25% đúng mồi → ×0.8 · mồi ủ cho cá ăn cám +40% → ×0.71
+// dế chũi cho cá săn mồi +50% → ×0.67 · lure cho cá săn mồi +35% → ×0.74
+function baitBiteMult(fish, bait) {
+  if (!fish || !bait) return 1;
+  if (fish.bait === bait) return 0.8;
+  if (bait === 'moi-u' && fish.bait === 'cam') return 0.71;
+  if (bait === 'de-chui' && fish.pred) return 0.67;
+  if (bait === 'lure' && fish.pred) return 0.74;
+  return 1;
+}
 function pickFish() {
   const pool = FISH.filter(f => f.map === S.map);
   const distFrac = (fx - castMinX()) / castRange(); // 0 gần .. 1 xa
   let total = 0;
   const ws = pool.map(f => {
     let w = f.w * ((distFrac > 0.65 && f.big) ? 2.5 : 1);
-    // Điểm câu sông: cá đặc trưng của điểm dễ gặp hơn
-    if (S.map === 'song' && spot && spot.fish.includes(f.id)) w *= 2.5;
+    // Điểm câu sông/đầm phá: cá đặc trưng của điểm dễ gặp hơn
+    if ((S.map === 'song' || S.map === 'dampha') && spot && spot.fish.includes(f.id)) w *= 2.5;
     // Đợt 2: buff "Cá lớn phù hộ" từ phóng sinh — cá to dễ gặp hơn 15%
     if (buffActive() && f.big) w *= 1.15;
+    // Trụ 2: nước ròng ở đầm phá — cua biển ra kiếm ăn, dễ gặp gấp đôi
+    if (S.map === 'dampha' && f.id === 'cua' && tideState().phase === 'rong') w *= 2;
     total += w; return w;
   });
   let r = Math.random() * total;
@@ -973,7 +1075,12 @@ function pickFish() {
 
 function startBite() {
   biteT = 0;
-  inv()[S.bait]--; save(); updateHUD();   // tốn 1 mồi trong túi
+  // Tốn mồi trong túi — mồi giả (lure) KHÔNG hao; không để số lượng âm
+  if (S.bait !== 'lure') {
+    const k = baitKey(S.bait);
+    inv()[k] = Math.max(0, (inv()[k] || 0) - 1);
+  }
+  save(); updateHUD();
   phase = 'BITE';
   Sfx.bite();
   splashes.push({ x: fx, y: fy, r: 6, a: 0.9 });
@@ -1027,6 +1134,18 @@ function biteAnim(pattern, t) {
       dy = ramp(t, 0.4, 0.7, 24); tilt = ramp(t, 0.4, 0.7, 0.4); break;
     case 'runtan': // cá chốt: rung lăn tăn rồi chìm nhẹ
       dy = Math.sin(t * 30) * 3 + ramp(t, 0.6, 1.2, 12); break;
+    // --- Pattern mới cho cá đầm phá (Trụ 2) ---
+    case 'vuocnhanh': // vược: nhấp nhanh 3 nhịp mạnh rồi kéo
+      dy = dip(t, 0.12, 0.24, 12) + dip(t, 0.36, 0.48, 12) + dip(t, 0.60, 0.72, 12) + ramp(t, 0.85, 1.2, 24);
+      tilt = ramp(t, 0.85, 1.2, 0.55); break;
+    case 'chemnhay': // chẽm: nhấp 1 cái, NHẢY đột biến rồi lôi sâu
+      dy = dip(t, 0.25, 0.40, 10) + dip(t, 0.55, 0.63, 17) + ramp(t, 0.80, 1.2, 30);
+      tilt = ramp(t, 0.80, 1.2, 0.75); break;
+    case 'cuai': // cua biển: chìm chậm ì ì rồi ghì đều
+      dy = Math.sin(t * 14) * 3 + ramp(t, 0.30, 1.2, 20); tilt = ramp(t, 0.30, 1.2, 0.3); break;
+    case 'giondai': // chép giòn: đẩy phao lên rồi kéo dai khỏe
+      dy = (t < 0.50 ? -10 * Math.sin(Math.PI * t / 0.50) : 0) + ramp(t, 0.55, 1.2, 22);
+      tilt = ramp(t, 0.55, 1.2, 0.45); break;
   }
   return { dy, tilt };
 }
@@ -1067,7 +1186,25 @@ function startFight() {
     zc: 0.5, surge: 0, diff: d,
     fill: 0.20 + r.line * 0.10,
     breakT: 0, slackT: 0, surgeT: rnd(0.8, 1.6),
+    surgeMag: 0.15 + d * 0.20, surgeTR: [0.8, 1.8], jump: false,
   };
+  // Trụ 2: kiểu kéo dây riêng của từng loài (pull)
+  const pull = fish.pull;
+  if (pull === 'nhanh') {        // vược: giãy nhanh nhiều đợt ngắn liên tục
+    fight.amp = 0.16 + d * 0.22; fight.speed = 2.6 + d * 3.0;
+    fight.surgeMag = 0.22 + d * 0.26; fight.surgeTR = [0.4, 0.9];
+  } else if (pull === 'nhay') {  // chẽm: ít đợt nhưng mỗi đợt nhảy mạnh đột biến
+    fight.amp = 0.10 + d * 0.18; fight.speed = 2.0 + d * 2.4;
+    fight.surgeMag = 0.30 + d * 0.32; fight.surgeTR = [1.4, 2.6]; fight.jump = true;
+  } else if (pull === 'i') {     // cua: ì đáy, kéo chậm nặng, tension ổn định cao
+    fight.amp = 0.06 + d * 0.10; fight.speed = 1.1 + d * 1.3;
+    fight.surgeMag = 0.06 + d * 0.10; fight.surgeTR = [1.6, 2.8];
+    fight.fill = 0.15 + r.line * 0.08;
+  } else if (pull === 'dai') {   // chép giòn: kéo đều khỏe dai
+    fight.amp = 0.12 + d * 0.20; fight.speed = 1.7 + d * 2.2;
+    fight.surgeMag = 0.12 + d * 0.18; fight.surgeTR = [1.0, 2.0];
+    fight.fill = 0.15 + r.line * 0.09;
+  }
   phase = 'FIGHT';
   Sfx.reelStart(); // máy câu bắt đầu rít
 }
@@ -1086,6 +1223,7 @@ function fightWin() {
   // Đếm cá cho cấp độ & mở khóa map
   S.totalFish = (S.totalFish || 0) + 1;
   if (S.map === 'ao') S.caughtAo = (S.caughtAo || 0) + 1;
+  if (S.map === 'song') S.caughtSong = (S.caughtSong || 0) + 1; // mở khóa đầm phá
   if (lastWeight > (S.biggestFish || 0)) S.biggestFish = lastWeight; // BXH: cá to nhất
   save();
   questEvent('catch', { fishId: fish.id, weight: lastWeight, map: S.map, spot: spot && spot.id, bait: S.bait });
@@ -1189,9 +1327,11 @@ function fightLost(msg) {
 // Sau mỗi lần giật/bo: kiểm tra còn mồi không
 function afterAttempt() {
   updateHUD();
-  if (inv()[S.bait] > 0) { enterCast(); return; }
-  const other = S.bait === 'giun' ? 'cam' : 'giun';
-  if (inv()[other] > 0) {
+  if (hasBait(S.bait)) { enterCast(); return; }
+  // Tự đổi sang loại mồi còn trong túi (ưu tiên giun → cám → mồi cao cấp)
+  const order = ['giun', 'cam', 'moi-u', 'de-chui', 'lure'];
+  const other = order.find(b => b !== S.bait && hasBait(b) && baitUsable(b));
+  if (other) {
     S.bait = other; save();
     toast('Hết mồi! Đã chuyển sang ' + BAITS[other].name + '.');
     enterCast();
@@ -1199,6 +1339,13 @@ function afterAttempt() {
     toast('Hết mồi! Về chuẩn bị thêm.');
     enterPrepare();
   }
+}
+// Còn mồi này trong túi không? (lure không hao nên chỉ cần đang sở hữu)
+function hasBait(b) { return (inv()[baitKey(b)] || 0) > 0; }
+// Mồi này có dùng được với cần đang cầm không? (lure chỉ cần máy)
+function baitUsable(b) {
+  if (b !== 'lure') return true;
+  return S.bag.rods.some(iid => { const r = rodInst(iid); return r && rodDef(r.id).type === 'may'; });
 }
 
 /* ---------- Đợt 2: Về nhà ---------- */
@@ -1403,7 +1550,8 @@ function onPress(e) {
     // Vùng chạm co giãn theo tỉ lệ hiển thị: đảm bảo ≥48px vật lý trên mobile
     const rr = cv.getBoundingClientRect();
     const hitR = Math.max(60, 48 / (rr.width / L.W));
-    const s = RIVER_SPOTS.find(s => { const sp = spotPos(s); return Math.hypot(p.x - sp.x, p.y - sp.y) < hitR; });
+    const arr = spotsFor(S.map);
+    const s = arr.find(s => { const sp = spotPos(s); return Math.hypot(p.x - sp.x, p.y - sp.y) < hitR; });
     if (s) {
       spot = s; Sfx.click();
       toast('Đã chọn: ' + s.name + ' — ' + s.desc);
@@ -1538,6 +1686,9 @@ bindClick('btn-kitchen', enterKitchen);
 bindClick('btn-wh-end', enterMenu);
 bindClick('btn-dig', () => enterDig(false));
 bindClick('btn-buy-cam-prep', () => buyCam());
+bindClick('btn-buy-mou-prep', () => { if (buyPremiumBait('moi-u')) renderPrepare(); });
+bindClick('btn-buy-dechui-prep', () => { if (buyPremiumBait('de-chui')) renderPrepare(); });
+bindClick('btn-buy-lure-prep', () => { if (buyPremiumBait('lure')) renderPrepare(); });
 // So tien bay len khi ban duoc ca
 function flyMoney(txt) {
   try {
@@ -1619,15 +1770,20 @@ $('btn-mute').addEventListener('click', () => {
 });
 $('btn-mute').textContent = Sfx.muted ? '🔇' : '🔊';
 
-// Chọn mồi
-$('card-giun').addEventListener('click', e => {
-  if (e.target.closest('button')) return;
-  S.bait = 'giun'; save(); Sfx.click(); renderPrepare();
-});
-$('card-cam').addEventListener('click', e => {
-  if (e.target.closest('button')) return;
-  S.bait = 'cam'; save(); Sfx.click(); renderPrepare();
-});
+// Chọn mồi (kể cả mồi cao cấp Trụ 2) — lure yêu cầu cần máy
+function selectBait(b) {
+  if (b === 'lure' && !baitUsable('lure')) {
+    toast('🎣 Mồi giả chỉ dùng được với cần máy! (Daiwa Crossfire 2.4m trở lên)'); Sfx.fail(); return;
+  }
+  S.bait = b; save(); Sfx.click(); renderPrepare();
+}
+[['card-giun', 'giun'], ['card-cam', 'cam'], ['card-mou', 'moi-u'], ['card-dechui', 'de-chui'], ['card-lure', 'lure']]
+  .forEach(pair => {
+    $(pair[0]).addEventListener('click', e => {
+      if (e.target.closest('button')) return;
+      selectBait(pair[1]);
+    });
+  });
 
 // Mua / trang bị (event delegation cho danh sách render động)
 document.addEventListener('click', e => {
@@ -1635,7 +1791,7 @@ document.addEventListener('click', e => {
   if (m) {
     Sfx.init(); Sfx.click();
     const mapId = m.dataset.map;
-    if (!mapUnlocked(mapId)) { toast('🔒 Chưa mở khóa! Câu 15 con ở ao làng hoặc đạt cấp 2.'); return; }
+    if (!mapUnlocked(mapId)) { toast(mapLockText(mapId)); return; }
     enterFish(mapId);
     return;
   }
@@ -1689,6 +1845,12 @@ document.addEventListener('click', e => {
     }
   } else if (act === 'buycam') {
     buyCam();
+  } else if (act === 'buymou') {
+    buyPremiumBait('moi-u');
+  } else if (act === 'buydechui') {
+    buyPremiumBait('de-chui');
+  } else if (act === 'buylure') {
+    buyPremiumBait('lure');
   } else if (act === 'dig') {
     enterDig(phase === 'SHOP');
   } else if (act === 'buycontainer') {
@@ -1713,6 +1875,22 @@ function buyCam() {
     trackSpend(CAM_PRICE);
     Sfx.sell(); toast('Đã mua ' + CAM_PACK + ' viên cám!');
   } else toast('Không đủ tiền!');
+}
+// Trụ 2: mua mồi cao cấp (vào kho ở nhà, không giới hạn)
+function buyPremiumBait(id) {
+  const def = BAITS[id];
+  if (!def) return false;
+  const price = id === 'moi-u' ? MOIU_PRICE : (id === 'de-chui' ? DECHUI_PRICE : LURE_PRICE);
+  if (S.money < price) { toast('Không đủ tiền!'); Sfx.fail(); return false; }
+  if (id === 'lure' && ((S.store.lure || 0) + (S.bag.lure || 0)) >= 1) {
+    toast('Đã có mồi giả rồi — dùng mãi không hết!'); return false;
+  }
+  S.money -= price;
+  const k = baitKey(id);
+  S.store[k] = (S.store[k] || 0) + 1;
+  save(); trackSpend(price);
+  Sfx.sell(); toast('Đã mua ' + def.name + '!');
+  return true;
 }
 // 🍱 Thực phẩm hồi thể lực: mua trong shop, ăn bất cứ lúc nào (kể cả đang câu)
 function foodQty(id) { return ((inv().food || {})[id]) || 0; }
@@ -1830,13 +2008,15 @@ function update(dt) {
   } else if (phase === 'FIGHT') {
     const f = fight;
     f.zt += dt;
-    // cá giãy: giật vùng an toàn ngẫu nhiên
+    // cá giãy: giật vùng an toàn ngẫu nhiên (cường độ & nhịp theo loài)
     f.surgeT -= dt;
     if (f.surgeT <= 0) {
-      f.surge = rnd(-1, 1) * (0.15 + (f.diff || 0) * 0.20); // cá to giãy mạnh hơn
-      f.surgeT = rnd(0.8, 1.8);
-      splashes.push({ x: fx + rnd(-24, 24), y: fy + rnd(-8, 8), r: 5, a: 0.9 });
-      spawnDrops(fx + rnd(-20, 20), fy, 4, 90); // cá quẫy bắn nước
+      f.surge = rnd(-1, 1) * (f.surgeMag || (0.15 + (f.diff || 0) * 0.20));
+      const tr = f.surgeTR || [0.8, 1.8];
+      f.surgeT = rnd(tr[0], tr[1]);
+      const sp = f.jump ? 9 : 5, dr = f.jump ? 9 : 4; // chẽm nhảy: nước bắn mạnh
+      splashes.push({ x: fx + rnd(-24, 24), y: fy + rnd(-8, 8), r: sp, a: 0.9 });
+      spawnDrops(fx + rnd(-20, 20), fy, dr, 90); // cá quẫy bắn nước
       Sfx.waterPlip();
     }
     f.surge *= Math.pow(0.25, dt); // giảm dần
@@ -1961,7 +2141,8 @@ function render() {
   Art.drawScene(ctx, tG, {
     W: L.W, H: L.H,
     map: S.map, sky: skyM, rodType: rod().type,
-    spotLayout: (S.map === 'song' && spot) ? { decor: spot.decor } : null,
+    spotLayout: ((S.map === 'song' || S.map === 'dampha') && spot) ? { decor: spot.decor } : null,
+    tide: S.map === 'dampha' ? { lvl: tideState().level } : null,
     angler: ap, rodBase: { x: ap.x + 40 * ak, y: ap.y - 100 * ak },
     fightFish: phase === 'FIGHT' ? { show: true, x: fx, y: fy, s: (fish && fish.big) ? 1.5 : 1 } : null,
     // Đồ đựng cá (mode Trốn vợ): vẽ xô/thùng câu trên bờ, rọng lưới ở mép nước
@@ -1978,7 +2159,7 @@ function render() {
     hint: (phase === 'CAST' || phase === 'WAIT' || phase === 'BITE') ? phaseHint : null,
     strike: phase === 'STRIKE' ? strike : null,
     fight: phase === 'FIGHT' ? { tension: fight.tension, zc: fight.zc, zw: fight.zw, prog: Math.min(fight.prog, 1) } : null,
-    spots: phase === 'SPOT' ? RIVER_SPOTS.map(s => {
+    spots: phase === 'SPOT' ? spotsFor(S.map).map(s => {
       const p = spotPos(s);
       return {
         x: p.x, y: p.y, name: s.name, flow: s.flow, desc: s.desc,
@@ -2011,6 +2192,16 @@ function loop(ts) {
     if (cm !== lastClockMin) {
       lastClockMin = cm;
       $('hud-clock').textContent = '🕐 ' + fmtClock(trip.gameMin);
+    }
+  }
+  // Trụ 2: cập nhật chip thủy triều khi đổi pha
+  if (isFishing() && S.map === 'dampha' && ! $('hud-tide').classList.contains('hidden')) {
+    const tp = tideState().phase;
+    if (tp !== lastTidePhase) {
+      lastTidePhase = tp;
+      const ts = tideState();
+      $('hud-tide').textContent = ts.icon + ' ' + ts.name;
+      toast(ts.icon + ' ' + ts.name + ' — mực nước đang thay đổi!');
     }
   }
   requestAnimationFrame(loop);
@@ -2150,8 +2341,8 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     forceStrikeWin() { if (strike) strike.pos = strike.zc; },
     forceFightWin() { if (fight) fight.prog = 1; },
     forceFightLost() { fightLost('Đứt dây! (test)'); },
-    selectSpot(i) { spot = RIVER_SPOTS[i]; },
-    enterSpot(i) { spot = RIVER_SPOTS[i]; enterCast(); },
+    selectSpot(i) { spot = (spotsFor(S.map).length ? spotsFor(S.map) : RIVER_SPOTS)[i]; },
+    enterSpot(i) { spot = (spotsFor(S.map).length ? spotsFor(S.map) : RIVER_SPOTS)[i]; enterCast(); },
     // Đồ đựng cá (test)
     cont() { return { containers: S.containers.slice(), active: S.activeContainer, kept: S.keptFish.slice(), cap: contDef().cap }; },    contKg() { return keptKg(); }, contLoad() { return contLoad(); },
     // Thể lực + đồ ăn (test)
@@ -2192,6 +2383,12 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     returnBagToStore() { returnBagToStore(); },
     rodWarnedFlag() { return rodWarned; },
     spotsInfo() { return RIVER_SPOTS.map(x => ({ id: x.id, ax: x.ax, ay: x.ay, pax: x.pax, pay: x.pay, decor: x.decor })); },
+    damphaSpotsInfo() { return DAMPH_SPOTS.map(x => ({ id: x.id, ax: x.ax, ay: x.ay, pax: x.pax, pay: x.pay, decor: x.decor })); },
+    tide() { return tideState(); },
+    fightInfo() { return fight ? { pull: fish.pull, surgeMag: fight.surgeMag, surgeTR: fight.surgeTR, jump: !!fight.jump, fill: fight.fill } : null; },
+    baitMultFor(fishId, baitId) { const f = FISH.find(x => x.id === fishId); return baitBiteMult(f, baitId); },
+    buyPremBait(id) { return buyPremiumBait(id); },
+    baitInfo() { return { bait: S.bait, bag: { moiU: S.bag.moiU, deChui: S.bag.deChui, lure: S.bag.lure }, store: { moiU: S.store.moiU, deChui: S.store.deChui, lure: S.store.lure } }; },
     bagCaps() { return BAG_CAPS; },
     showPrepare() { enterPrepare(); },
     showShop() { enterShop(); },
