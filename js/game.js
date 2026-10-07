@@ -4,6 +4,7 @@
 
 const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
 
 /* ---------- Dual-layout: landscape 960x540 / portrait 540x960 ---------- */
 const L = { W: 960, H: 540, portrait: false };
@@ -54,7 +55,9 @@ window.addEventListener('orientationchange', updateLayout);
 /* ---------- Lưu trữ ---------- */
 const SAVE_KEY = 'cauCaAoLang_v1';
 function defaultSave() {
-  return { money: START_MONEY, rods: ['tre'], rod: 'tre', giun: 5, cam: 0, bait: 'giun',
+  return { money: START_MONEY, bait: 'giun',
+           // Kho ở nhà (không giới hạn) + Túi đi câu (giới hạn theo BAG_CAPS)
+           store: null, bag: null, rodSeq: 1,
            muted: false, totalFish: 0, caughtAo: 0, map: 'ao', quests: null, mode: 'free',
            // Đợt 2: Trốn vợ đi câu
            suspicion: 0, sincerity: 0, happiness: 0, merit: 0, totalMerit: 0, buffUntil: 0,
@@ -66,9 +69,7 @@ function defaultSave() {
            // chỉ "Cho vào đồ đựng" — về nhà mới Bán/Dâng/Nấu. (Tự do giữ nguyên.)
            containers: ['xo'], activeContainer: 'xo', keptFish: [],
            // Thanh thể lực: tốn khi quăng/đào/bo/nấu; hết (=0) thì ăn đồ hoặc chờ hồi
-           stamina: 100, staminaTs: 0,
-           // Kho đồ ăn hồi thể lực: S.food = { foodId: số lượng }
-           food: {} };
+           stamina: 100, staminaTs: 0 };
 }
 let S;
 try { S = Object.assign(defaultSave(), JSON.parse(localStorage.getItem(SAVE_KEY) || '{}')); }
@@ -86,11 +87,154 @@ S.basket = [];
 // Tương thích save cũ: thể lực mặc định đầy, timestamp hồi phục = bây giờ
 if (S.stamina == null) S.stamina = STAMINA.max;
 if (!S.staminaTs) S.staminaTs = Date.now();
-// Tương thích save cũ: kho đồ ăn
-if (!S.food || typeof S.food !== 'object') S.food = {};
+// Di trú kho đồ + túi đi câu (cần: string[] -> [{iid,id,cond}]; giun/cam/food -> store)
+migrateStoreBag();
 regenStamina(); // hồi thể lực theo thời gian thực kể từ lần chơi trước
 function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
-function rod() { return RODS.find(r => r.id === S.rod) || RODS[0]; }
+/* ---------- Kho ở nhà + Túi đi câu + Độ bền cần ---------- */
+function migrateStoreBag() {
+  // Kho: store = { rods: [{iid,id,cond}], giun, cam, food: {} }
+  if (!S.store || !Array.isArray(S.store.rods)) {
+    const oldRods = Array.isArray(S.rods) ? S.rods : ['tre'];
+    S.store = {
+      rods: oldRods.map((id, i) => ({ iid: 'r' + (i + 1), id: String(id), cond: 100 })),
+      giun: S.giun || 0, cam: S.cam || 0,
+      food: (S.food && typeof S.food === 'object') ? S.food : {},
+    };
+    S.rodSeq = oldRods.length + 1;
+  }
+  // Vá cond cho save dở dang
+  S.store.rods.forEach(r => { if (r.cond == null) r.cond = 100; });
+  // Túi: bag = { rods: [iid], activeRod: iid, giun, cam, food: {} }
+  if (!S.bag || !Array.isArray(S.bag.rods)) {
+    const rids = S.store.rods.slice(0, BAG_CAPS.rods).map(r => r.iid);
+    S.bag = { rods: rids, activeRod: rids[0] || null,
+      giun: Math.min(BAG_CAPS.giun, S.store.giun),
+      cam: Math.min(BAG_CAPS.camGoi * CAM_PACK, S.store.cam), food: {} };
+    for (const f of FOODS) S.bag.food[f.id] = Math.min(BAG_CAPS.foodEach, (S.store.food[f.id] || 0));
+    S.store.giun -= S.bag.giun; S.store.cam -= S.bag.cam;
+    for (const f of FOODS) S.store.food[f.id] = (S.store.food[f.id] || 0) - S.bag.food[f.id];
+  }
+  // Dọn field cũ (đã chuyển vào store)
+  delete S.rods; delete S.rod; delete S.giun; delete S.cam; delete S.food;
+  save();
+}
+function rodInst(iid) { return (S.store.rods || []).find(r => r.iid === iid); }
+function activeRodInst() {
+  return rodInst(S.bag && S.bag.activeRod) || S.store.rods[0] || { iid: null, id: 'tre', cond: 100 };
+}
+function rodDef(id) { return RODS.find(r => r.id === id) || RODS[0]; }
+function rod() { return rodDef(activeRodInst().id); }
+function rodName(inst) { return rodDef(inst.id).name; }
+// Kho đồ đang dùng: lúc đi câu = túi, ở nhà = kho
+function inv() { return isFishing() ? S.bag : S.store; }
+function repairCost(def, cond) {
+  if (def.id === 'tre') return 0;
+  return Math.round(def.price * (100 - cond) / 100 * 0.3);
+}
+function condColor(c) { return c > 50 ? '#66bb6a' : (c > 25 ? '#ffa726' : '#e53935'); }
+function condBar(c, w) {
+  return '<span class="condbar"' + (w ? ' style="width:' + w + 'px"' : '') + '><i style="width:' +
+    Math.max(0, Math.round(c)) + '%;background:' + condColor(c) + '"></i></span>';
+}
+// Hao mòn cần đang cầm
+function wearRod(n) {
+  const inst = activeRodInst();
+  if (!inst || !inst.iid) return;
+  inst.cond = Math.max(0, (inst.cond == null ? 100 : inst.cond) - n);
+  save(); updateHUD();
+  if (inst.cond <= 25 && !rodWarned) {
+    rodWarned = true; Sfx.fail();
+    toast('⚠️ ' + rodName(inst) + ' sắp hỏng! (' + Math.round(inst.cond) + '%) — về sửa hoặc mang cần dự phòng.');
+  }
+}
+// true = vừa gãy (caller dừng hành động hiện tại)
+function checkRodBreak(ctx) {
+  const inst = activeRodInst();
+  if (inst && inst.iid && (inst.cond == null ? 100 : inst.cond) <= 0) { breakRod(ctx); return true; }
+  return false;
+}
+function breakRod(ctx) {
+  const inst = activeRodInst(), def = rodDef(inst.id);
+  S.store.rods = S.store.rods.filter(r => r.iid !== inst.iid);
+  S.bag.rods = S.bag.rods.filter(i => i !== inst.iid);
+  Sfx.fail();
+  if (inst.id === 'tre') {
+    const ni = { iid: 'r' + (S.rodSeq++), id: 'tre', cond: 100 };
+    S.store.rods.unshift(ni); S.bag.rods.unshift(ni.iid); S.bag.activeRod = ni.iid;
+    save(); updateHUD(); renderPrepareSafe();
+    toast('💥 Cần tre gãy rồi! Bố thương, cho cây tre mới tinh 🥰' + (ctx === 'fight' ? ' Cá xổng mất...' : ''));
+    return;
+  }
+  save();
+  if (S.bag.rods.length) {
+    S.bag.activeRod = S.bag.rods[0]; save(); updateHUD();
+    toast('💥 GÃY CẦN ' + def.name + '! May có cần dự phòng trong túi 🎒' + (ctx === 'fight' ? ' Cá xổng mất...' : ''));
+  } else {
+    updateHUD();
+    toast('💥 GÃY CẦN ' + def.name + '! Hết cần dự phòng — về nhà thôi...');
+    setTimeout(() => { if (isFishing()) { returnBagToStore(); enterPrepare(); } }, 2000);
+  }
+}
+// Đổi cần đang cầm (khi mang 2 cần)
+function switchRod() {
+  if (S.bag.rods.length < 2) return;
+  const i = S.bag.rods.indexOf(S.bag.activeRod);
+  S.bag.activeRod = S.bag.rods[(i + 1) % S.bag.rods.length];
+  save(); updateHUD(); Sfx.click();
+  toast('🎣 Đã chuyển sang ' + rod().name + '.');
+}
+// Đóng/mở cần trong túi (tối đa BAG_CAPS.rods)
+function packRod(iid) { // true: đổi túi thành công, false: bị chặn
+  const b = S.bag, ix = b.rods.indexOf(iid);
+  if (ix >= 0) {
+    if (b.rods.length <= 1) { toast('Phải mang theo ít nhất 1 cần!'); Sfx.fail(); return false; }
+    b.rods.splice(ix, 1);
+    if (b.activeRod === iid) b.activeRod = b.rods[0];
+  } else {
+    if (b.rods.length >= BAG_CAPS.rods) { toast('🎒 Túi chỉ đựng được ' + BAG_CAPS.rods + ' cần! (túi 2 ngăn)'); Sfx.fail(); return false; }
+    b.rods.push(iid);
+    if (!b.activeRod) b.activeRod = iid;
+  }
+  save(); Sfx.click(); renderPrepare();
+  return true;
+}
+// Stepper mồi/đồ ăn trong túi (giới hạn nắp túi + tồn kho)
+function bagStep(kind, d) { // kind: 'giun' (±1) | 'camGoi' (±1 gói = CAM_PACK viên)
+  if (kind === 'giun') {
+    const cur = S.bag.giun || 0, avail = (S.store.giun || 0) + cur;
+    const nv = Math.max(0, Math.min(BAG_CAPS.giun, avail, cur + d));
+    S.bag.giun = nv; S.store.giun -= (nv - cur);
+  } else {
+    const cur = S.bag.cam || 0, avail = (S.store.cam || 0) + cur;
+    const nv = Math.max(0, Math.min(BAG_CAPS.camGoi * CAM_PACK, avail, cur + d * CAM_PACK));
+    S.bag.cam = nv; S.store.cam -= (nv - cur);
+  }
+  save(); Sfx.click(); renderPrepare();
+}
+function bagFoodStep(id, d) {
+  S.bag.food = S.bag.food || {}; S.store.food = S.store.food || {};
+  const cur = S.bag.food[id] || 0, avail = (S.store.food[id] || 0) + cur;
+  const nv = Math.max(0, Math.min(BAG_CAPS.foodEach, avail, cur + d));
+  S.bag.food[id] = nv; S.store.food[id] = (S.store.food[id] || 0) - (nv - cur);
+  save(); Sfx.click(); renderPrepare();
+}
+function bagStepper(kind, icon, name, bq, bmax, unit, storeQ) {
+  return '<div class="card"><div class="card-title">' + icon + ' ' + name + '</div>' +
+    '<div class="bag-step"><button class="btn small" data-act="bagstep" data-kind="' + kind + '" data-d="-1">−</button>' +
+    '<b>' + bq + ' ' + unit + '</b>' +
+    '<button class="btn small" data-act="bagstep" data-kind="' + kind + '" data-d="1">+</button></div>' +
+    '<div class="card-desc">Tối đa ' + bmax + ' ' + unit + ' · Kho còn ' + storeQ + '</div></div>';
+}
+// Về nhà: đồ thừa trong túi trả về kho
+function returnBagToStore() {
+  S.store.giun += S.bag.giun || 0; S.bag.giun = 0;
+  S.store.cam += S.bag.cam || 0; S.bag.cam = 0;
+  S.store.food = S.store.food || {}; S.bag.food = S.bag.food || {};
+  for (const f of FOODS) { S.store.food[f.id] = (S.store.food[f.id] || 0) + (S.bag.food[f.id] || 0); S.bag.food[f.id] = 0; }
+  save();
+}
+function renderPrepareSafe() { try { if (phase === 'PREPARE') renderPrepare(); } catch (e) {} }
 /* ---------- Hệ thống đồ đựng cá (mode Trốn vợ) ---------- */
 function contDef() { return containerById(S.activeContainer); }
 function keptCount() { return (S.keptFish || []).length; }
@@ -109,6 +253,7 @@ function level() { return Math.min(15, Math.floor((S.totalFish || 0) / 10) + 1);
 
 /* ---------- Thanh thể lực ---------- */
 let stamWarned = false;  // cảnh báo thể lực thấp 1 lần mỗi chuyến
+let rodWarned = false;   // cảnh báo cần sắp hỏng 1 lần mỗi chuyến
 let stamRegenT = 0;
 // Hồi phục theo thời gian thực: +1 mỗi STAMINA.regenSec giây, tối đa STAMINA.max.
 // Tính từ staminaTs (lần cập nhật cuối) nên thoát game quay lại vẫn được hồi.
@@ -227,7 +372,6 @@ let riskT = 0, overWarned = false, contShakeT = 0; // rủi ro đồ đựng: ro
 let lastClockMin = -1;        // phút game đã hiển thị trên HUD (tránh ghi DOM mỗi frame)
 
 /* ---------- DOM helper ---------- */
-const $ = id => document.getElementById(id);
 const screens = ['scr-menu', 'scr-prepare', 'scr-shop', 'scr-help', 'scr-dig', 'pop-result', 'scr-map', 'scr-quest',
   'scr-call', 'scr-wifehome', 'scr-kitchen', 'scr-leaderboard', 'scr-name', 'scr-container', 'scr-food'];
 function show(id) {
@@ -262,9 +406,13 @@ function updateHUD() {
     w.classList.remove('hidden');
     w.textContent = (session.weather === 'mua' ? '🌧️ Vừa mưa' : '☀️ Nắng') + (session.golden ? ' ⚡ Giờ vàng' : '');
   } else w.classList.add('hidden');
-  $('hud-giun').textContent = '🪱 ' + S.giun;
-  $('hud-cam').textContent = '🟤 ' + S.cam;
-  $('hud-rod').textContent = '🎣 ' + rod().name;
+  $('hud-giun').textContent = '🪱 ' + inv().giun;
+  $('hud-cam').textContent = '🟤 ' + (inv().cam || 0);
+  (function () {
+    const inst = activeRodInst(), c = inst.cond == null ? 100 : inst.cond;
+    $('hud-rod').innerHTML = '🎣 ' + rod().name + ' ' + condBar(c, 44);
+  })();
+  $('btn-rod-switch').classList.toggle('hidden', !(isFishing() && S.bag.rods.length > 1));
   // Thanh thể lực (lúc đi câu, đào giun, ở nhà)
   regenStamina();
   const sv = Math.round(S.stamina == null ? STAMINA.max : S.stamina);
@@ -345,7 +493,7 @@ function startWifeTrip() {
     callAt: rnd(120, 360), resumePhase: null,
   };
   S.keptFish = []; // đầu chuyến: đồ đựng trống
-  riskT = 0; overWarned = false; contShakeT = 0; stamWarned = false;
+  riskT = 0; overWarned = false; contShakeT = 0; stamWarned = false; rodWarned = false;
   if (!S.containers.includes(S.activeContainer)) S.activeContainer = S.containers[S.containers.length - 1];
   S.weekEntries[todayStr()] = true;
   save();
@@ -377,7 +525,7 @@ function enterMapSelect() { phase = 'MAP'; show('scr-map'); renderMapSelect(); }
 /* ---------- Vào phiên câu ---------- */
 function enterFish(mapId) {
   S.map = mapId; spot = null; save();
-  stamWarned = false;
+  stamWarned = false; rodWarned = false;
   // Thời tiết ngẫu nhiên mỗi phiên: 25% vừa mưa xong → cá ăn mạnh
   session.weather = Math.random() < 0.25 ? 'mua' : 'nang';
   session.golden = isGoldenHour();
@@ -473,8 +621,8 @@ function claimQuest(qid) {
   if (!it || !it.done || it.claimed) return;
   const r = questDef(qid).reward;
   if (r.money) S.money += r.money;
-  if (r.cam) S.cam += r.cam;
-  if (r.giun) S.giun += r.giun;
+  if (r.cam) S.store.cam += r.cam;
+  if (r.giun) S.store.giun += r.giun;
   it.claimed = true; save();
   Sfx.sell(); toast('🎁 Nhận thưởng: ' + questRewardText(questDef(qid)) + '!');
   renderQuests(); updateHUD();
@@ -486,34 +634,80 @@ function statBar(lbl, v) {
 }
 
 function rodCard(r, forShop) {
-  const owned = S.rods.includes(r.id), using = S.rod === r.id;
+  const insts = S.store.rods.filter(x => x.id === r.id);
+  const owned = insts.length > 0;
   const locked = level() < (r.reqLevel || 1);
   const typeTag = r.type === 'may' ? ' <span class="count">[máy]</span>' : ' <span class="count">[đài]</span>';
-  let btn;
-  if (using) btn = '<button class="btn small" disabled>Đang dùng</button>';
-  else if (locked) btn = '<button class="btn small" disabled>🔒 Cấp ' + r.reqLevel + ' mở khóa</button>';
-  else if (owned) btn = '<button class="btn small" data-act="equip" data-id="' + r.id + '">Dùng</button>';
-  else btn = '<button class="btn small" data-act="buyrod" data-id="' + r.id + '"' +
+  let btn, extra = '';
+  if (locked) btn = '<button class="btn small" disabled>🔒 Cấp ' + r.reqLevel + ' mở khóa</button>';
+  else if (!owned) btn = '<button class="btn small" data-act="buyrod" data-id="' + r.id + '"' +
     (S.money < r.price ? ' disabled' : '') + '>Mua ' + fmt(r.price) + '</button>';
-  return '<div class="card' + (using ? ' selected' : '') + (owned ? ' owned' : '') + '">' +
+  else {
+    const worst = insts.reduce((a, b) => (a.cond < b.cond ? a : b));
+    const wc = Math.round(worst.cond), cost = repairCost(r, worst.cond);
+    extra = '<div class="stat"><span class="lbl">Tình trạng</span><div class="bar"><i style="width:' + wc +
+      '%;background:' + condColor(worst.cond) + '"></i></div></div>' +
+      '<div class="card-desc">Đang có ' + insts.length + ' cây — cây mòn nhất còn ' + wc + '%.</div>';
+    btn = cost > 0
+      ? '<button class="btn small" data-act="repairrod" data-id="' + r.id + '"' +
+        (S.money < cost ? ' disabled' : '') + '>🔧 Sửa ' + fmt(cost) + '</button>'
+      : '<button class="btn small" disabled>✨ Mới tinh</button>';
+  }
+  return '<div class="card' + (owned ? ' owned' : '') + '">' +
     '<div class="card-title">🎣 ' + r.name + typeTag + '</div>' +
-    statBar('Tầm quăng', r.cast) + statBar('Độ nhạy', r.sense) + statBar('Độ bền', r.line) +
-    '<div class="card-desc">' + r.desc + '</div>' + btn +
+    '<div class="card-desc spec-line">' + r.spec + '</div>' +
+    statBar('Tầm quăng', r.cast) + statBar('Độ nhạy', r.sense) + statBar('Sức chịu', r.line) +
+    '<div class="card-desc">' + r.desc + '</div>' + extra + btn +
     (forShop ? '<br><a href="#" class="aff-link" data-item="' + r.name + '">🛒 Mua ngoài đời</a>' : '') + '</div>';
 }
 
 function renderPrepare() {
   $('prep-money').textContent = '💰 ' + fmt(S.money);
-  // Cần
-  $('rod-list').innerHTML = RODS.map(r => rodCard(r, false)).join('');
-  // Mồi
-  $('bait-giun-count').textContent = 'x' + S.giun;
-  $('bait-cam-count').textContent = 'x' + S.cam;
+  // --- Túi đi câu: chạm thẻ cần để cho vào / bỏ ra (tối đa 2) ---
+  $('bag-rods').innerHTML = S.store.rods.map(inst => {
+    const r = rodDef(inst.id), packed = S.bag.rods.includes(inst.iid);
+    const active = S.bag.activeRod === inst.iid, c = Math.round(inst.cond == null ? 100 : inst.cond);
+    return '<div class="card' + (packed ? ' selected' : '') + '" data-act="packrod" data-id="' + inst.iid + '">' +
+      '<div class="card-title">🎣 ' + r.name +
+      (active ? ' <span class="count">đang cầm</span>' : '') + (packed && !active ? ' <span class="count">🎒 dự phòng</span>' : '') + '</div>' +
+      '<div class="card-desc spec-line">' + r.spec + '</div>' +
+      '<div class="stat"><span class="lbl">Tình trạng</span><div class="bar"><i style="width:' + c +
+      '%;background:' + condColor(inst.cond) + '"></i></div></div>' +
+      '<div class="card-desc">' + (packed ? 'Chạm để bỏ ra khỏi túi' : 'Chạm để cho vào túi') + '</div></div>';
+  }).join('') || '<p class="kept-empty">Chưa có cần nào!</p>';
+  // --- Túi: mồi & đồ ăn ---
+  const camGoiBag = Math.floor((S.bag.cam || 0) / CAM_PACK);
+  const camGoiMax = Math.min(BAG_CAPS.camGoi, Math.floor(((S.store.cam || 0) + (S.bag.cam || 0)) / CAM_PACK));
+  let items = bagStepper('giun', '🪱', 'Giun đất', S.bag.giun || 0,
+    Math.min(BAG_CAPS.giun, (S.store.giun || 0) + (S.bag.giun || 0)), 'con', (S.store.giun || 0) + ' con');
+  items += bagStepper('camGoi', '🟤', 'Cám câu', camGoiBag, camGoiMax, 'gói', Math.floor((S.store.cam || 0) / CAM_PACK) + ' gói');
+  for (const f of FOODS) {
+    const bq = (S.bag.food || {})[f.id] || 0;
+    const mx = Math.min(BAG_CAPS.foodEach, ((S.store.food || {})[f.id] || 0) + bq);
+    items += '<div class="card"><div class="card-title">' + f.icon + ' ' + f.name + '</div>' +
+      '<div class="bag-step"><button class="btn small" data-act="bagfoodstep" data-id="' + f.id + '" data-d="-1">−</button>' +
+      '<b>' + bq + ' cái</b>' +
+      '<button class="btn small" data-act="bagfoodstep" data-id="' + f.id + '" data-d="1">+</button></div>' +
+      '<div class="card-desc">Tối đa ' + mx + ' cái · Kho còn ' + (((S.store.food || {})[f.id] || 0)) + '</div></div>';
+  }
+  $('bag-items').innerHTML = items;
+  // --- Kho ở nhà ---
+  $('store-summary').innerHTML = '🪱 Giun: <b>' + (S.store.giun || 0) + '</b> con · 🟤 Cám: <b>' +
+    (S.store.cam || 0) + '</b> viên' +
+    FOODS.map(f => ' · ' + f.icon + ' ' + f.name + ': <b>' + (((S.store.food || {})[f.id] || 0)) + '</b>').join('') +
+    ' · 🎣 Cần: <b>' + S.store.rods.length + '</b> cây';
+  // --- Mồi đang chọn (lấy trong túi) ---
+  $('bait-giun-count').textContent = 'x' + (S.bag.giun || 0);
+  $('bait-cam-count').textContent = 'x' + (S.bag.cam || 0);
   $('card-giun').classList.toggle('selected', S.bait === 'giun');
   $('card-cam').classList.toggle('selected', S.bait === 'cam');
-  const hasBait = (S.bait === 'giun' && S.giun > 0) || (S.bait === 'cam' && S.cam > 0);
-  $('btn-go-fish').disabled = !hasBait;
-  $('prep-nobait-hint').classList.toggle('hidden', hasBait);
+  const hasBait = (S.bait === 'giun' && (S.bag.giun || 0) > 0) || (S.bait === 'cam' && (S.bag.cam || 0) > 0);
+  const hasRod = S.bag.rods.length > 0;
+  $('btn-go-fish').disabled = !hasBait || !hasRod;
+  const hintEl = $('prep-nobait-hint');
+  hintEl.classList.toggle('hidden', hasBait && hasRod);
+  hintEl.textContent = !hasRod ? '⚠️ Chưa cho cần vào túi! Chạm thẻ cần ở trên.'
+    : (!hasBait ? '⚠️ Hết mồi trong túi! Chỉnh số lượng ở trên hoặc đào thêm giun.' : '');
   $('btn-dig').textContent = digLabel();
   $('btn-dig').disabled = digsLeft() <= 0 || (S.stamina || 0) <= 0;
   // Đồ đựng cá (chỉ mode Trốn vợ): chọn trong số đã sở hữu
@@ -537,11 +731,11 @@ function renderShop() {
   $('shop-money').textContent = '💰 ' + fmt(S.money);
   $('shop-rods').innerHTML = RODS.map(r => rodCard(r, true)).join('');
   $('shop-baits').innerHTML =
-    '<div class="card"><div class="card-title">🟤 Cám câu <span class="count">x' + S.cam + '</span></div>' +
+    '<div class="card"><div class="card-title">🟤 Cám câu <span class="count">x' + S.store.cam + '</span></div>' +
     '<div class="card-desc">' + fmt(CAM_PRICE) + ' / gói ' + CAM_PACK + ' viên — cá cắn nhanh hơn giun.</div>' +
     '<button class="btn small" data-act="buycam"' + (S.money < CAM_PRICE ? ' disabled' : '') + '>Mua ' + fmt(CAM_PRICE) + '</button>' +
     '<br><a href="#" class="aff-link" data-item="Cám câu">🛒 Mua ngoài đời</a></div>' +
-    '<div class="card"><div class="card-title">🪱 Giun đất <span class="count">x' + S.giun + '</span></div>' +
+    '<div class="card"><div class="card-title">🪱 Giun đất <span class="count">x' + S.store.giun + '</span></div>' +
     '<div class="card-desc">Miễn phí — tự tay đào mới có! Còn ' + digsLeft() + '/' + DIG.perDay + ' lượt hôm nay.</div>' +
     '<button class="btn small" data-act="dig"' + (digsLeft() <= 0 || (S.stamina || 0) <= 0 ? ' disabled' : '') + '>' + digLabel() + '</button></div>';
   // Đồ đựng cá (mode Trốn vợ) — xô ghẻ mặc định đã có
@@ -558,7 +752,7 @@ function renderShop() {
   }).join('');
   // 🍱 Thực phẩm: hồi thể lực ngay cả khi đang câu
   $('shop-food').innerHTML = FOODS.map(f => {
-    const qty = (S.food && S.food[f.id]) || 0;
+    const qty = ((S.store.food || {})[f.id]) || 0;
     return '<div class="card"><span class="cont-icon">' + f.icon + '</span>' +
       '<div class="card-title">' + f.name + ' <span class="count">x' + qty + '</span></div>' +
       '<div class="card-desc">+' + f.gain + ' ⚡ — ' + f.desc + '</div>' +
@@ -677,7 +871,7 @@ function enterDig(fromShop) {
   function endDig() {
     clearInterval(pop); clearInterval(tick);
     const dug = digS ? digS.dug : 0; digS = null;
-    if (dug > 0) { S.giun += dug; save(); toast('Đào được ' + dug + ' con giun! 🪱'); }
+    if (dug > 0) { S.store.giun += dug; save(); toast('Đào được ' + dug + ' con giun! 🪱'); }
     else toast('Chưa đào được con nào...');
     updateHUD();
     if ($('dig-from-shop').value === '1') enterShop(); else enterPrepare();
@@ -692,14 +886,25 @@ function enterCast(msg) {
   hint = msg || null;
 }
 function waterBounds(x, y) {
+  if (S.map === 'song' && spot) {
+    const w = L.portrait ? spot.pwx : spot.wx, h = L.portrait ? spot.pwy : spot.wy;
+    return x >= w[0] && x <= w[1] && y >= h[0] && y <= h[1];
+  }
   if (L.portrait) return x >= 30 && x <= 510 && y >= 205 && y <= 720;
   if (S.map === 'song') return x >= 60 && x <= 900 && y >= 230 && y <= 430;
   return x >= 60 && x <= 900 && y >= 215 && y <= 445;
+}
+// Vị trí chân cần thủ theo map/điểm (cần thủ ĐỨNG ĐÚNG điểm đã chọn)
+function anglerPos() {
+  if (S.map === 'song' && spot)
+    return L.portrait ? { x: spot.pax, y: spot.pay } : { x: spot.ax, y: spot.ay };
+  return L.portrait ? { x: 150, y: 912 } : { x: 110, y: 530 };
 }
 
 function doCast(x, y) {
   if (!waterBounds(x, y)) { toast('Chạm vào mặt nước để quăng cần!'); return; }
   if (!drainStamina(STAMINA.cast)) { toast('😮‍💨 Hết thể lực! Ăn gì đó hoặc nghỉ một lát...'); Sfx.fail(); return; }
+  if (checkRodBreak('cast')) return; // cần đã mòn hết -> gãy
   const maxX = castMinX() + rod().cast * castRange();
   if (x > maxX) { x = maxX; toast('Cần của bạn chỉ quăng tới đây!'); }
   fx = x; fy = y; hint = null;
@@ -723,6 +928,7 @@ function doCast(x, y) {
   const wt = BAITS[S.bait].wait;
   waitT = rnd(wt[0], wt[1]) * mult;
   phase = 'WAIT';
+  wearRod(1); // quăng cần -1 độ bền
 }
 
 function pickFish() {
@@ -744,7 +950,7 @@ function pickFish() {
 
 function startBite() {
   biteT = 0;
-  S[S.bait]--; save(); updateHUD();   // tốn 1 mồi
+  inv()[S.bait]--; save(); updateHUD();   // tốn 1 mồi trong túi
   phase = 'BITE';
   Sfx.bite();
   splashes.push({ x: fx, y: fy, r: 6, a: 0.9 });
@@ -827,6 +1033,7 @@ function strikeMiss(msg) {
 }
 
 function startFight() {
+  if (checkRodBreak('fight')) { fight = null; afterAttempt(); return; } // gãy lúc vào bo -> mất cá
   const r = rod(), d = fish.diff;
   // Cá khó: giãy mạnh hơn (amp, speed, surge), vùng an toàn hẹp hơn, lên cá chậm hơn
   fight = {
@@ -848,6 +1055,7 @@ function fightWin() {
   lastPrice = Math.round(lastWeight * fish.price);
   // Bo cá thắng: −(6 + round(diff×8)) — cá càng khó càng mệt
   drainStamina(6 + Math.round(fish.diff * 8));
+  wearRod(3 + Math.round(fish.diff * 6)); // bo thắng mòn cần theo độ khó cá
   // Đếm cá cho cấp độ & mở khóa map
   S.totalFish = (S.totalFish || 0) + 1;
   if (S.map === 'ao') S.caughtAo = (S.caughtAo || 0) + 1;
@@ -946,6 +1154,7 @@ function showFunny(text) {
 function fightLost(msg) {
   Sfx.fail(); fight = null; toast(msg);
   drainStamina(STAMINA.fightLost); // bo thua −4
+  wearRod(2); // bo thua −2 độ bền
   questEvent('miss');
   afterAttempt();
 }
@@ -953,9 +1162,9 @@ function fightLost(msg) {
 // Sau mỗi lần giật/bo: kiểm tra còn mồi không
 function afterAttempt() {
   updateHUD();
-  if (S[S.bait] > 0) { enterCast(); return; }
+  if (inv()[S.bait] > 0) { enterCast(); return; }
   const other = S.bait === 'giun' ? 'cam' : 'giun';
-  if (S[other] > 0) {
+  if (inv()[other] > 0) {
     S.bait = other; save();
     toast('Hết mồi! Đã chuyển sang ' + BAITS[other].name + '.');
     enterCast();
@@ -989,6 +1198,7 @@ function goWifeHome() {
     addTitle('Chồng ngoan');
     toast('🏠 Về đúng giờ! Vợ gật gù: "Hôm nay ngoan đấy" 😌');
   }
+  returnBagToStore();
   trip = null; homeConfirmT = 0;
   save();
   phase = 'WIFEHOME';
@@ -1279,6 +1489,7 @@ function buyBribe(id) {
 }
 bindClick('btn-to-quest', enterQuest);
 bindClick('btn-food', enterFood);
+bindClick('btn-rod-switch', () => switchRod());
 bindClick('btn-to-shop', enterShop);
 bindClick('btn-to-help', enterHelp);
 bindClick('btn-help-back', enterMenu);
@@ -1288,6 +1499,7 @@ bindClick('btn-quest-back', enterMenu);
 bindClick('btn-map-back', enterPrepare);
 bindClick('btn-go-fish', () => enterMapSelect());
 bindClick('btn-home', () => {
+  if (isFishing()) returnBagToStore(); // đồ thừa trả về kho
   if (S.mode === 'wife' && trip && isFishing()) confirmGoHome();
   else enterMenu();
 });
@@ -1415,6 +1627,12 @@ document.addEventListener('click', e => {
     updateHUD();
     return;
   }
+  const pk = e.target.closest('[data-act="packrod"]');
+  if (pk) { Sfx.init(); Sfx.click(); packRod(pk.dataset.id); return; }
+  const bs = e.target.closest('[data-act="bagstep"]');
+  if (bs) { bagStep(bs.dataset.kind, parseInt(bs.dataset.d, 10) || 0); return; }
+  const bf = e.target.closest('[data-act="bagfoodstep"]');
+  if (bf) { bagFoodStep(bf.dataset.id, parseInt(bf.dataset.d, 10) || 0); return; }
   const b = e.target.closest('[data-act]');
   if (!b) return;
   Sfx.init(); Sfx.click();
@@ -1423,12 +1641,24 @@ document.addEventListener('click', e => {
     const r = RODS.find(x => x.id === id);
     if (level() < (r.reqLevel || 1)) { toast('Cần đạt cấp ' + r.reqLevel + ' để mua cần này!'); }
     else if (S.money >= r.price) {
-      S.money -= r.price; S.rods.push(r.id); S.rod = r.id; save();
-      trackSpend(r.price);
-      Sfx.sell(); toast('Đã mua ' + r.name + '!');
+      S.money -= r.price;
+      S.store.rods.push({ iid: 'r' + (S.rodSeq++), id: r.id, cond: 100 });
+      save(); trackSpend(r.price);
+      Sfx.sell(); toast('Đã mua ' + r.name + '! Vào Chuẩn bị để cho vào túi 🎒'); renderShop();
     }
-  } else if (act === 'equip') {
-    S.rod = id; save(); toast('Đã trang bị ' + rod().name + '.');
+  } else if (act === 'repairrod') {
+    const r = RODS.find(x => x.id === id);
+    const insts = S.store.rods.filter(x => x.id === id);
+    if (insts.length) {
+      const worst = insts.reduce((a, b) => (a.cond < b.cond ? a : b));
+      const cost = repairCost(r, worst.cond);
+      if (S.money < cost) { toast('Không đủ tiền sửa!'); Sfx.fail(); }
+      else {
+        S.money -= cost; worst.cond = 100; save();
+        if (cost > 0) trackSpend(cost);
+        Sfx.sell(); toast('🔧 Đã sửa ' + r.name + ' như mới!'); renderShop();
+      }
+    }
   } else if (act === 'buycam') {
     buyCam();
   } else if (act === 'dig') {
@@ -1451,20 +1681,20 @@ document.addEventListener('click', e => {
 });
 function buyCam() {
   if (S.money >= CAM_PRICE) {
-    S.money -= CAM_PRICE; S.cam += CAM_PACK; save();
+    S.money -= CAM_PRICE; S.store.cam += CAM_PACK; save();
     trackSpend(CAM_PRICE);
     Sfx.sell(); toast('Đã mua ' + CAM_PACK + ' viên cám!');
   } else toast('Không đủ tiền!');
 }
 // 🍱 Thực phẩm hồi thể lực: mua trong shop, ăn bất cứ lúc nào (kể cả đang câu)
-function foodQty(id) { return (S.food && S.food[id]) || 0; }
+function foodQty(id) { return ((inv().food || {})[id]) || 0; }
 function buyFood(id) {
   const f = FOODS.find(x => x.id === id);
   if (!f) return false;
   if (S.money < f.price) { toast('Không đủ tiền!'); Sfx.fail(); return false; }
   S.money -= f.price;
-  if (!S.food) S.food = {};
-  S.food[id] = foodQty(id) + 1;
+  S.store.food = S.store.food || {};
+  S.store.food[id] = ((S.store.food[id] || 0)) + 1;
   save(); trackSpend(f.price);
   Sfx.sell(); toast('Đã mua ' + f.icon + ' ' + f.name + '!');
   return true;
@@ -1488,7 +1718,7 @@ function eatFood(id) {
   const f = FOODS.find(x => x.id === id);
   if (!f) return false;
   if (foodQty(id) <= 0) { toast('Hết ' + f.name + ' rồi!'); Sfx.fail(); return false; }
-  S.food[id]--;
+  inv().food[id]--;
   regenStamina();
   S.stamina = Math.min(STAMINA.max, (S.stamina || 0) + f.gain);
   S.staminaTs = Date.now();
@@ -1683,9 +1913,12 @@ function render() {
   let phaseHint = hint;
   if (phase === 'WAIT' && !phaseHint) phaseHint = 'Đang chờ cá cắn... 👀 nhìn phao!';
   if (phase === 'BITE') phaseHint = '⚡ Cá cắn! Nhấn ngay!';
+  const ap = anglerPos(), ak = L.portrait ? 1 : 0.72; // tỉ lệ vẽ cần thủ
   Art.drawScene(ctx, tG, {
     W: L.W, H: L.H,
     map: S.map, sky: skyM, rodType: rod().type,
+    spotLayout: (S.map === 'song' && spot) ? { decor: spot.decor } : null,
+    angler: ap, rodBase: { x: ap.x + 40 * ak, y: ap.y - 100 * ak },
     fightFish: phase === 'FIGHT' ? { show: true, x: fx, y: fy, s: (fish && fish.big) ? 1.5 : 1 } : null,
     // Đồ đựng cá (mode Trốn vợ): vẽ xô/thùng câu trên bờ, rọng lưới ở mép nước
     container: (function () {
@@ -1701,7 +1934,13 @@ function render() {
     hint: (phase === 'CAST' || phase === 'WAIT' || phase === 'BITE') ? phaseHint : null,
     strike: phase === 'STRIKE' ? strike : null,
     fight: phase === 'FIGHT' ? { tension: fight.tension, zc: fight.zc, zw: fight.zw, prog: Math.min(fight.prog, 1) } : null,
-    spots: phase === 'SPOT' ? RIVER_SPOTS.map(s => { const p = spotPos(s); return { x: p.x, y: p.y, name: s.name, flow: s.flow }; }) : null,
+    spots: phase === 'SPOT' ? RIVER_SPOTS.map(s => {
+      const p = spotPos(s);
+      return {
+        x: p.x, y: p.y, name: s.name, flow: s.flow, desc: s.desc,
+        fish: s.fish.map(fid => { const f = FISH.find(x => x.id === fid); return f ? f.name : fid; }).join(', ')
+      };
+    }) : null,
     spotHint: phase === 'SPOT' ? hint : null,
   });
 }
@@ -1861,6 +2100,7 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     forceFightWin() { if (fight) fight.prog = 1; },
     forceFightLost() { fightLost('Đứt dây! (test)'); },
     selectSpot(i) { spot = RIVER_SPOTS[i]; },
+    enterSpot(i) { spot = RIVER_SPOTS[i]; enterCast(); },
     // Đồ đựng cá (test)
     cont() { return { containers: S.containers.slice(), active: S.activeContainer, kept: S.keptFish.slice(), cap: contDef().cap }; },    contKg() { return keptKg(); }, contLoad() { return contLoad(); },
     // Thể lực + đồ ăn (test)
@@ -1868,7 +2108,7 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
     setStam(v) { S.stamina = v; save(); updateHUD(); },
     setStamTs(ts) { S.staminaTs = ts; save(); },
     regen() { regenStamina(); return S.stamina; },
-    food() { return Object.assign({}, S.food); },
+    food() { return Object.assign({}, inv().food); },
     buyFoodTest(id) { return buyFood(id); },
     eatFoodTest(id) { return eatFood(id); },
     openFood() { enterFood(); },
@@ -1887,6 +2127,23 @@ if (typeof location !== 'undefined' && location.search.indexOf('test=1') >= 0) {
       fish = f; lastWeight = weight; lastPrice = (price == null ? Math.round(f.price * weight) : price);
       return keepFishToContainer();
     },
+    // Độ bền cần + túi/kho (test)
+    storeBag() { return { store: S.store, bag: S.bag, rodSeq: S.rodSeq }; },
+    setBag(b) { S.bag = Object.assign({}, S.bag, b); save(); },
+    setStore(st) { S.store = Object.assign({}, S.store, st); save(); },
+    wearRod(n) { wearRod(n); },
+    checkRodBreak(ctx) { return checkRodBreak(ctx); },
+    repairCostOf(id, cond) { const r = RODS.find(x => x.id === id); return repairCost(r, cond); },
+    rodCond() { const i = activeRodInst(); return i ? i.cond : null; },
+    packRod(iid) { return packRod(iid); },
+    bagStep(k, d) { bagStep(k, d); },
+    bagFoodStep(id, d) { bagFoodStep(id, d); },
+    returnBagToStore() { returnBagToStore(); },
+    rodWarnedFlag() { return rodWarned; },
+    spotsInfo() { return RIVER_SPOTS.map(x => ({ id: x.id, ax: x.ax, ay: x.ay, pax: x.pax, pay: x.pay, decor: x.decor })); },
+    bagCaps() { return BAG_CAPS; },
+    showPrepare() { enterPrepare(); },
+    showShop() { enterShop(); },
   };
 }
 
