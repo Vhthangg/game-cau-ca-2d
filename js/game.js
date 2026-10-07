@@ -301,7 +301,7 @@ function updateHUD() {
   const showCont = S.mode === 'wife' && (trip || isFishing());
   hc.classList.toggle('hidden', !showCont);
   if (showCont) {
-    hc.textContent = contDef().icon + ' ' + keptKg().toFixed(1) + '/' + contDef().cap + 'kg';
+    hc.innerHTML = contDef().icon + ' ' + keptKg().toFixed(1) + '/' + contDef().cap + 'kg';
     hc.classList.toggle('hot', contLoad() > 1);
   }
   $('menu-money').textContent = fmt(S.money);
@@ -879,7 +879,7 @@ function renderWifeResult() {
   // Luật sức chứa theo KG: thùng đầy cứng (disable), rọng/xô cho nhồi quá tải kèm rủi ro
   const c = contDef(), kg = keptKg(), load = contLoad();
   const btn = $('btn-wife-keep');
-  btn.textContent = c.icon + ' Cho vào ' + c.name + ' (' + kg.toFixed(1) + '/' + c.cap + 'kg)';
+  btn.innerHTML = c.icon + ' Cho vào ' + c.name + ' (' + kg.toFixed(1) + '/' + c.cap + 'kg)';
   btn.classList.remove('danger');
   if (c.id === 'thung') {
     const over = kg + lastWeight > c.cap + 1e-9;
@@ -1120,7 +1120,7 @@ function enterKitchen() {
 function enterContainer() {
   const c = contDef(), b = S.keptFish || [], kg = keptKg(), load = contLoad();
   const pct = Math.min(100, Math.round(load * 100));
-  $('cont-title').textContent = c.icon + ' ' + c.name;
+  $('cont-title').innerHTML = c.icon + ' ' + c.name;
   $('cont-sub').textContent = 'Đang giữ ' + kg.toFixed(1) + '/' + c.cap + ' kg' +
     (load > 1 ? ' ⚠️ QUÁ TẢI!' : '') +
     (c.place === 'water' ? ' — rọng ngập dưới nước, cá sống khỏe 🐟' : ' — để trên bờ');
@@ -1410,7 +1410,7 @@ document.addEventListener('click', e => {
   if (dc && S.containers.includes(dc.dataset.cont)) {
     Sfx.init(); Sfx.click();
     S.activeContainer = dc.dataset.cont; save();
-    toast(contDef().icon + ' Đã chọn mang theo ' + contDef().name + '.');
+    toast('Đã chọn mang theo ' + contDef().name + '.');
     if (phase === 'PREPARE') renderPrepare();
     updateHUD();
     return;
@@ -1438,7 +1438,7 @@ document.addEventListener('click', e => {
     if (c.price > 0 && !S.containers.includes(id) && S.money >= c.price) {
       S.money -= c.price; S.containers.push(id); S.activeContainer = id; save();
       trackSpend(c.price);
-      Sfx.sell(); toast('Đã mua ' + c.icon + ' ' + c.name + '!');
+      Sfx.sell(); toast('Đã mua ' + c.name + '!');
     }
   } else if (act === 'buyfood') {
     buyFood(id);
