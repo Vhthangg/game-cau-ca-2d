@@ -271,7 +271,7 @@ function updateHUD() {
   const w = $('hud-weather');
   if (isFishing()) {
     w.classList.remove('hidden');
-    w.textContent = (session.weather === 'mua' ? '🌧️ Vừa mưa' : '☀️ Nắng') + (session.golden ? ' ⚡GIỜ VÀNG' : '');
+    w.textContent = (session.weather === 'mua' ? '🌧️ Vừa mưa' : '☀️ Nắng') + (session.golden ? ' ⚡ Giờ vàng' : '');
   } else w.classList.add('hidden');
   $('hud-giun').textContent = '🪱 ' + S.giun;
   $('hud-cam').textContent = '🟤 ' + S.cam;
@@ -399,7 +399,7 @@ function enterFish(mapId) {
   session.weather = Math.random() < 0.25 ? 'mua' : 'nang';
   session.golden = isGoldenHour();
   if (session.weather === 'mua') setTimeout(() => toast('🌧️ Trời vừa tạnh mưa — cá đang ăn mạnh!'), 600);
-  if (session.golden) setTimeout(() => toast('⚡ GIỜ VÀNG câu cá! Tỉ lệ cắn tăng.'), 1400);
+  if (session.golden) setTimeout(() => toast('⚡ Giờ vàng câu cá! Tỉ lệ cắn tăng.'), 1400);
   if (mapId === 'song') {
     phase = 'SPOT'; show(null); updateHUD();
     hint = 'Chạm vào 1 trong 3 điểm câu!';
@@ -880,6 +880,7 @@ function fightWin() {
   $('res-funny').classList.add('hidden');
   $('res-funny').textContent = '';
   show('pop-result');
+  burstConfetti($('pop-result').querySelector('.panel'));
 }
 // Cập nhật nút "Cho vào đồ đựng" theo sức chứa còn lại
 function renderWifeResult() {
@@ -1057,6 +1058,7 @@ function sellKept() {
   save();
   Sfx.sell();
   lbAfterSell(); // gửi điểm BXH ngầm
+  flyMoney('+' + fmt(total));
   addSuspicion(5, 'tiền bán cá giấu ở đâu?');
   toast('💰 ' + funny(FUNNY_SELL, { price: fmt(total) }));
   renderWifeHome(); updateHUD();
@@ -1203,9 +1205,9 @@ function actionCfg() {
     case 'BITE':
       return { label: '⚡ GIẬT NGAY!', fn: () => startStrike() };
     case 'STRIKE':
-      return { label: '🎯 NHẤN ĐÚNG NHỊP!', fn: () => { strikeJudge(); } };
+      return { label: '🎯 Nhấn đúng nhịp!', fn: () => { strikeJudge(); } };
     case 'FIGHT':
-      return { label: '💪 GIỮ ĐỂ BO CÁ', hold: true };
+      return { label: '💪 Giữ để bo cá', hold: true };
     default:
       return null;
   }
@@ -1305,10 +1307,36 @@ bindClick('btn-kitchen', enterKitchen);
 bindClick('btn-wh-end', enterMenu);
 bindClick('btn-dig', () => enterDig(false));
 bindClick('btn-buy-cam-prep', () => buyCam());
+// So tien bay len khi ban duoc ca
+function flyMoney(txt) {
+  try {
+    const d = document.createElement('div');
+    d.className = 'fly-money'; d.textContent = txt;
+    $('ui').appendChild(d);
+    setTimeout(() => d.remove(), 1250);
+  } catch (e) {}
+}
+// Confetti an mung khi len ca
+function burstConfetti(panel) {
+  if (!panel) return;
+  try {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cols = ['#f9a825', '#43a047', '#42a5f5', '#ec407a', '#ffeb3b', '#ab47bc'];
+    for (let i = 0; i < 14; i++) {
+      const c = document.createElement('i'); c.className = 'confetti';
+      c.style.left = (18 + Math.random() * 64) + '%';
+      c.style.background = cols[i % cols.length];
+      c.style.animationDelay = (Math.random() * 0.18) + 's';
+      panel.appendChild(c);
+      setTimeout(() => c.remove(), 1500);
+    }
+  } catch (e) {}
+}
 bindClick('btn-sell', () => {
   S.money += lastPrice; S.totalEarned = (S.totalEarned || 0) + lastPrice; save(); Sfx.sell();
   questEvent('sell');
   lbAfterSell(); // gửi điểm BXH ngầm
+  flyMoney('+' + fmt(lastPrice));
   toast('Đã bán cá +' + fmt(lastPrice) + '!');
   $('pop-result').classList.add('hidden');
   afterAttempt();
@@ -1592,10 +1620,13 @@ function resumeFromCall() {
 }
 
 function render() {
+  // Tam trang bau troi theo gio thuc + gio vang + thoi tiet phien cau
+  const _nd = new Date();
+  const skyM = Art.moodFor(_nd.getHours() + _nd.getMinutes() / 60, session.golden, session.weather);
   // Mini-game đào giun: vẽ vườn đất trên canvas chính
   if (phase === 'DIG' && digS) {
     Art.drawDigGarden(ctx, {
-      W: L.W, H: L.H, t: tG,
+      W: L.W, H: L.H, t: tG, sky: skyM,
       worms: digS.worms, hoes: digS.hoes, parts: digS.parts, marks: digS.marks,
       decor: digS.decor, bucket: digBucket(),
     });
@@ -1617,7 +1648,8 @@ function render() {
   if (phase === 'BITE') phaseHint = '⚡ Cá cắn! Nhấn ngay!';
   Art.drawScene(ctx, tG, {
     W: L.W, H: L.H,
-    map: S.map,
+    map: S.map, sky: skyM, rodType: rod().type,
+    fightFish: phase === 'FIGHT' ? { show: true, x: fx, y: fy, s: (fish && fish.big) ? 1.5 : 1 } : null,
     // Đồ đựng cá (mode Trốn vợ): vẽ xô/thùng câu trên bờ, rọng lưới ở mép nước
     container: (function () {
       if (S.mode !== 'wife' || !isFishing()) return null;
@@ -1682,7 +1714,8 @@ function enterName(fromBoard) {
 }
 async function loadBoard() {
   const st = $('lb-status'), list = $('lb-list'), me = $('lb-me');
-  st.classList.remove('hidden'); list.innerHTML = '';
+  st.classList.remove('hidden');
+  list.innerHTML = '<div class="lb-row skel"></div><div class="lb-row skel"></div><div class="lb-row skel"></div><div class="lb-row skel"></div><div class="lb-row skel"></div>';
   st.textContent = '⏳ Đang tải bảng xếp hạng...';
   me.classList.add('hidden');
   try {
