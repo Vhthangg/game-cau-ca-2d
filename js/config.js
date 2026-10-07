@@ -47,15 +47,34 @@ const FISH = [
   { id: 'ca-he',      name: 'Cá he',      min: 0.2, max: 0.8, price: 3500, pattern: 'nhapnhe',  diff: 0.20, w: 3, color: '#c9b458', big: false, map: 'song', bait: 'cam', escape: 0.18 },
   { id: 'bong-tuong', name: 'Bống tượng', min: 0.2, max: 1.0, price: 9000, pattern: 'hut',      diff: 0.40, w: 2, color: '#6b5b45', big: false, map: 'song', bait: 'giun', escape: 0.25 },
   { id: 'ca-chot',    name: 'Cá chốt',    min: 0.1, max: 0.5, price: 3000, pattern: 'runtan',    diff: 0.20, w: 3, color: '#8c8c88', big: false, map: 'song', bait: 'giun', escape: 0.15 },
+  // --- Cửa biển / Đầm phá (Trụ 2) ---
+  // pred: cá săn mồi — mê dế chũi & mồi giả lure. pull: kiểu kéo dây lúc bo.
+  { id: 'vuoc',      name: 'Cá vược',     min: 0.5, max: 4.0, price: 12000, pattern: 'vuocnhanh', diff: 0.70, w: 2, color: '#a8b8c8', big: true,  map: 'dampha', bait: 'giun', escape: 0.65, pred: true, pull: 'nhanh' },
+  { id: 'chem',      name: 'Cá chẽm',     min: 1.0, max: 8.0, price: 15000, pattern: 'chemnhay',  diff: 0.80, w: 1, color: '#8a95a5', big: true,  map: 'dampha', bait: 'giun', escape: 0.75, pred: true, pull: 'nhay' },
+  { id: 'cua',       name: 'Cua biển',    min: 0.3, max: 1.5, price: 18000, pattern: 'cuai',      diff: 0.75, w: 1, color: '#8a4a2b', big: false, map: 'dampha', bait: 'giun', escape: 0.50, pred: true, pull: 'i' },
+  { id: 'chep-gion', name: 'Cá chép giòn',min: 1.5, max: 7.0, price: 13000, pattern: 'giondai',   diff: 0.65, w: 2, color: '#d4a53a', big: true,  map: 'dampha', bait: 'cam', escape: 0.60, pull: 'dai' },
 ];
+// Cá săn mồi (ăn mồi sống): trê, chim, ngạnh, lăng, tai tượng + 4 loài đầm phá
+['tre-fish', 'chim', 'nganh', 'lang-song', 'tai-tuong'].forEach(id => {
+  const f = FISH.find(x => x.id === id); if (f) f.pred = true;
+});
 
 // Mồi: wait = thời gian chờ cắn (giây), w = trọng lượng (mồi nặng ít bị trôi)
+// Mồi cao cấp (Trụ 2): moi-u (mồi ủ lên men), de-chui (dế chũi), lure (mồi giả)
 const BAITS = {
-  giun: { name: 'Giun đất', wait: [4, 12],   w: 0.30 },
-  cam:  { name: 'Cám câu',  wait: [2.5, 7],  w: 0.55 },
+  giun:    { name: 'Giun đất',       wait: [4, 12],   w: 0.30 },
+  cam:     { name: 'Cám câu',        wait: [2.5, 7],  w: 0.55 },
+  'moi-u': { name: 'Mồi ủ lên men',  wait: [2.5, 7],  w: 0.55 },
+  'de-chui': { name: 'Dế chũi',      wait: [3, 9],    w: 0.35 },
+  lure:    { name: 'Mồi giả (lure)', wait: [2, 6],    w: 0.55 },
 };
+// Mồi -> key trong túi/kho (S.bag / S.store)
+function baitKey(b) { return b === 'moi-u' ? 'moiU' : (b === 'de-chui' ? 'deChui' : b); }
 const CAM_PRICE = 5000;  // 5.000đ / gói (lạm phát)
 const CAM_PACK = 10;     // 10 viên / gói
+const MOIU_PRICE = 20000;   // mồi ủ lên men: 20.000đ / gói (dùng 1 gói mỗi lần quăng)
+const DECHUI_PRICE = 8000;  // dế chũi: 8.000đ / con
+const LURE_PRICE = 60000;   // mồi giả: 60.000đ / cái, KHÔNG hao, chỉ dùng được với cần máy
 const START_MONEY = 200;
 
 /* ===== Thanh thể lực =====
@@ -77,14 +96,21 @@ const FOODS = [
 
 // Đào giun: time = giây mỗi lượt, popMs = khoảng cách giun trồi, activeMs = thời gian giun ở lại,
 // yield = số giun mỗi lần chạm trúng, perDay = số lượt đào tối đa mỗi ngày (giới hạn độ khó)
-const DIG = { time: 20, popMs: 800, activeMs: 650, minYield: 1, maxYield: 2, perDay: 3 };
+const DIG = { time: 20, popMs: 800, activeMs: 715, minYield: 1, maxYield: 2, perDay: 3 };
 
 // Map
 const MAPS = [
-  { id: 'ao',   name: 'Ao làng', icon: '🏡', desc: 'Ao quê yên bình — nơi học câu đài cơ bản.' },
-  { id: 'song', name: 'Sông quê', icon: '🌊', desc: 'Dòng chảy, gầm cầu, bãi bồi — học câu đáy sông.' },
+  { id: 'ao',     name: 'Ao làng',          icon: '🏡', desc: 'Ao quê yên bình — nơi học câu đài cơ bản.' },
+  { id: 'song',   name: 'Sông quê',         icon: '🌊', desc: 'Dòng chảy, gầm cầu, bãi bồi — học câu đáy sông.' },
+  { id: 'dampha', name: 'Cửa biển / Đầm phá', icon: '🦀', desc: 'Nước lợ, rừng đước, thủy triều — cá biển khỏe, giá cao!' },
 ];
 function mapName(id) { const m = MAPS.find(m => m.id === id); return m ? m.icon + ' ' + m.name : id; }
+// Text điều kiện mở khóa hiển thị ở thẻ map bị khóa
+function mapLockText(id) {
+  if (id === 'song') return '🔒 Mở khóa: câu 15 con ở ao làng hoặc đạt cấp 2';
+  if (id === 'dampha') return '🔒 Mở khóa: đạt cấp 6 hoặc câu 25 con ở sông quê';
+  return '🔒 Chưa mở khóa';
+}
 
 // Điểm câu ở sông quê: flow = độ xiết dòng (0..1)
 const RIVER_SPOTS = [
@@ -108,8 +134,38 @@ const RIVER_SPOTS = [
     wx: [60, 760], wy: [230, 430], pwx: [40, 500], pwy: [210, 700],
     decor: 'baiboi' },
 ];
+// Điểm câu ở đầm phá (Trụ 2): flow = độ xiết dòng (0..1)
+const DAMPH_SPOTS = [
+  { id: 'cuasong',  name: 'Cửa sông',  x: 200, y: 305, px: 120, py: 380, flow: 0.6,
+    desc: 'Cửa sông dòng xiết — vược, chẽm săn mồi.',
+    fish: ['vuoc', 'chem'],
+    ax: 150, ay: 498, pax: 120, pay: 912,
+    wx: [200, 900], wy: [230, 430], pwx: [40, 500], pwy: [210, 700],
+    decor: 'cuasong' },
+  { id: 'rungduoc', name: 'Rừng đước', x: 480, y: 305, px: 270, py: 380, flow: 0.2,
+    desc: 'Rừng đước nước êm — chẽm, cua, chép giòn trú.',
+    fish: ['chem', 'cua', 'chep-gion'],
+    ax: 470, ay: 498, pax: 270, pay: 912,
+    wx: [60, 900], wy: [230, 430], pwx: [40, 500], pwy: [210, 700],
+    decor: 'rungduoc' },
+  { id: 'baitrieu', name: 'Bãi triều', x: 760, y: 350, px: 420, py: 420, flow: 0.3,
+    desc: 'Bãi triều nông — cua bò, chép giòn kiếm ăn.',
+    fish: ['vuoc', 'cua', 'chep-gion'],
+    ax: 790, ay: 498, pax: 420, pay: 912,
+    wx: [60, 760], wy: [230, 430], pwx: [40, 500], pwy: [210, 700],
+    decor: 'baitrieu' },
+];
+// Danh sách điểm câu theo map (map có điểm chọn: sông, đầm phá)
+function spotsFor(mapId) {
+  if (mapId === 'song') return RIVER_SPOTS;
+  if (mapId === 'dampha') return DAMPH_SPOTS;
+  return [];
+}
 // Túi đi câu: 2 ngăn cần (kiểu túi Rice Fishing TC-23) + giới hạn mồi/đồ ăn
-const BAG_CAPS = { rods: 2, giun: 30, camGoi: 10, foodEach: 3 };
+const BAG_CAPS = { rods: 2, giun: 30, camGoi: 10, foodEach: 3,
+  moiU: 10,      // mồi ủ: 10 gói
+  deChui: 10,    // dế chũi: 10 con
+  lure: 1 };     // lure: 1 cái (không hao)
 function spotById(id) { return RIVER_SPOTS.find(s => s.id === id); }
 
 // Nhiệm vụ ngày: type — catch_any | catch_species | big_fish | use_baits | spots | catch_map | sell | streak
