@@ -202,6 +202,7 @@ const Art = (function () {
       return g;
     });
     ctx.fillRect(x, y, w, h);
+    if (opt.tint) { ctx.fillStyle = opt.tint; ctx.fillRect(x, y, w, h); } // nước lợ đầm phá
     const sx = x + w * (M.mood === 'night' ? 0.8 : P.sun.x);
     const shimW = 30 + Math.sin(t * 2.3) * 9;
     const sg = ctx.createLinearGradient(0, y, 0, y + h);
@@ -324,11 +325,50 @@ const Art = (function () {
     'basa': { fork: 1, silver: 1 }, 'tra': { fork: 1, silver: 1 },
     'thac-lac': { slim: 1.5 }, 'bong-tuong': { spots: 1, bigHead: 1 },
     'sac': { spots: 1 }, 'ca-he': { silver: 1, slim: 1.15 }, 'ca-chot': { slim: 1.25 },
+    // Trụ 2: cá đầm phá
+    'vuoc': { slim: 1.2, silver: 1, fork: 1 },      // bạc, vảy nhỏ, đuôi chẻ
+    'chem': { deep: 1.22, bigMouth: 1, silver: 1 }, // mình xám bạc, miệng rộng
+    'chep-gion': { bigScales: 1, deep: 1.25 },      // vảy vàng to
+    'cua': { crab: 1 },                             // cua biển: vẽ riêng
   };
+  // Cua biển: mai nâu, càng đỏ, chân nhỏ — vẽ riêng vì không phải hình cá
+  function drawCrabIcon(ctx, s) {
+    // càng đỏ
+    ctx.fillStyle = '#c0392b';
+    [-1, 1].forEach(sd => {
+      ctx.save(); ctx.translate(sd * s * 0.30, -s * 0.06); ctx.rotate(sd * 0.5);
+      ctx.beginPath(); ctx.ellipse(0, 0, s * 0.13, s * 0.09, 0, 0, 6.29); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(sd * s * 0.10, -s * 0.02); ctx.lineTo(sd * s * 0.20, -s * 0.10); ctx.lineTo(sd * s * 0.17, 0);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    });
+    // chân
+    ctx.strokeStyle = '#5d3a1e'; ctx.lineWidth = Math.max(1.5, s * 0.035); ctx.lineCap = 'round';
+    for (let i = -1; i <= 1; i++) {
+      [-1, 1].forEach(sd => {
+        ctx.beginPath(); ctx.moveTo(sd * s * 0.22, s * 0.05);
+        ctx.lineTo(sd * s * (0.34 + Math.abs(i) * 0.04), s * (0.14 + i * 0.03)); ctx.stroke();
+      });
+    }
+    // mai nâu
+    ctx.fillStyle = '#8a4a2b';
+    ctx.beginPath(); ctx.ellipse(0, 0, s * 0.30, s * 0.20, 0, 0, 6.29); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.15)';
+    ctx.beginPath(); ctx.ellipse(-s * 0.06, -s * 0.05, s * 0.14, s * 0.08, -0.4, 0, 6.29); ctx.fill();
+    // mắt lồi
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(s * 0.16, -s * 0.14, s * 0.035, 0, 6.29); ctx.fill();
+    ctx.beginPath(); ctx.arc(s * 0.24, -s * 0.14, s * 0.035, 0, 6.29); ctx.fill();
+    ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(s * 0.16, -s * 0.14, s * 0.017, 0, 6.29); ctx.fill();
+    ctx.beginPath(); ctx.arc(s * 0.24, -s * 0.14, s * 0.017, 0, 6.29); ctx.fill();
+  }
   function drawFishIcon(ctx, fish, x, y, s) {
     // Ve ca nhin ngang, s = chieu dai than
     ctx.save(); ctx.translate(x, y);
     const feat = FISH_FEAT[fish.id] || {};
+    if (feat.crab) { drawCrabIcon(ctx, s); ctx.restore(); return; }
     const c = fish.color;
     const bodyH = s * 0.17 * (feat.deep || 1) / (feat.slim || 1);
     // duoi (ca da tron duoi che sau, ca chep duoi do)
@@ -381,9 +421,13 @@ const Art = (function () {
         ctx.stroke();
       });
     }
+    // mieng rong (ca chem san moi)
+    if (feat.bigMouth) {
+      ctx.strokeStyle = 'rgba(20,25,30,.85)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(s * 0.40, bodyH * 0.1, s * 0.11, 0.4, Math.PI - 0.6); ctx.stroke();
+    }
     // mat (bong tuong dau to mat loi)
-    const es = feat.bigHead ? 1.25 : 1;
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s * 0.32, -bodyH * 0.25, s * 0.045 * es, 0, Math.PI * 2); ctx.fill();
+    const es = feat.bigHead ? 1.25 : 1;    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s * 0.32, -bodyH * 0.25, s * 0.045 * es, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(s * 0.335, -bodyH * 0.25, s * 0.022 * es, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
@@ -560,6 +604,7 @@ const Art = (function () {
     const W = v.W || 960, H = v.H || 540;
     if (H > W) { drawPortraitScene(ctx, t, v, W, H); return; }
     if (v.map === 'song') { drawRiverScene(ctx, t, v); return; }
+    if (v.map === 'dampha') { drawEstScene(ctx, t, v); return; }
     // Landscape 960x540 (W,H đã có từ v)
 
     const sky = v.sky || { mood: 'day', wet: false };
@@ -704,6 +749,121 @@ const Art = (function () {
     drawOverlay(ctx, t, v);
   }
 
+  // --- Cửa biển / Đầm phá (Trụ 2): rừng đước, bãi triều, biển xa, nước lợ, thủy triều ---
+  // Rừng đước/mắm ven bờ xa: tán tròn (khác thông), rễ chống, dải biển xa lộ giữa các tán
+  function drawMangroveFar(ctx, W, baseY, t, s) {
+    s = s || 1;
+    // dải biển xa ở chân trời
+    ctx.fillStyle = '#7fa8b8'; ctx.fillRect(0, baseY - 58 * s, W, 58 * s);
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 2;
+    for (let x = 0; x < W; x += 64) {
+      const yo = Math.sin(x * 0.05 + t * 1.4) * 3;
+      ctx.beginPath(); ctx.moveTo(x, baseY - 30 * s + yo);
+      ctx.quadraticCurveTo(x + 16, baseY - 34 * s + yo, x + 32, baseY - 30 * s + yo); ctx.stroke();
+    }
+    // tán đước: cụm lá tròn
+    for (let x = -20; x < W + 40; x += 52 * s) {
+      const h = (26 + (((x * 37) % 20) + 20) % 20) * s;
+      ctx.fillStyle = '#2f5d3a';
+      ctx.beginPath(); ctx.ellipse(x + 26 * s, baseY - h, 30 * s, h * 0.62, 0, 0, 6.29); ctx.fill();
+      ctx.fillStyle = '#3a6e46';
+      ctx.beginPath(); ctx.ellipse(x + 18 * s, baseY - h - 6 * s, 16 * s, h * 0.4, -0.3, 0, 6.29); ctx.fill();
+    }
+    // rễ chống
+    ctx.strokeStyle = '#4a3524'; ctx.lineWidth = 3 * s;
+    for (let x = 0; x < W; x += 40 * s) {
+      ctx.beginPath(); ctx.moveTo(x + 20 * s, baseY - 6 * s); ctx.lineTo(x + 12 * s, baseY + 18 * s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + 20 * s, baseY - 6 * s); ctx.lineTo(x + 28 * s, baseY + 18 * s); ctx.stroke();
+    }
+  }
+  function drawEstScene(ctx, t, v) {
+    const W = 960, H = 540;
+    const sky = v.sky || { mood: 'day', wet: false };
+    const decor = (v.spotLayout && v.spotLayout.decor) || 'overview';
+    const tideLvl = (v.tide && typeof v.tide.lvl === 'number') ? v.tide.lvl : 0.5;
+    const wtop = 185 - (tideLvl - 0.5) * 22; // mực nước lên/xuống nhẹ theo triều
+    drawSky(ctx, W, 150, t, sky);
+    drawMangroveFar(ctx, W, 172, t, 1); // rừng đước + biển xa
+    // bãi bùn lộ ra khi nước ròng
+    if (wtop > 186) { ctx.fillStyle = '#9a7c52'; ctx.fillRect(0, 185, W, wtop - 185); }
+    drawWater(ctx, 0, wtop, W, 285, t, sky, { rows: 7, river: true, tint: 'rgba(110,150,130,.22)' });
+    // --- Bờ gần theo điểm câu ---
+    if (decor === 'cuasong') {
+      ctx.fillStyle = '#8f8f86'; ctx.fillRect(0, 452, W, 88);      // bờ đá cửa sông
+      ctx.fillStyle = '#74746c'; ctx.fillRect(0, 452, W, 8);
+      ctx.fillStyle = '#6f6f68';
+      [[120, 500, 26], [300, 515, 34], [620, 505, 28], [830, 518, 36]].forEach(rk => {
+        ctx.beginPath(); ctx.arc(rk[0], rk[1], rk[2], 0, 6.29); ctx.fill();
+      });
+    } else if (decor === 'rungduoc') {
+      ctx.fillStyle = '#8a7a58'; ctx.fillRect(0, 452, W, 88);      // bờ bùn rừng đước
+      ctx.fillStyle = '#6f6247'; ctx.fillRect(0, 452, W, 8);
+      // rễ thở đước nhô lên
+      ctx.strokeStyle = '#4a3b28'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      for (let x = 40; x < W; x += 52) {
+        for (let k = -1; k <= 1; k++) {
+          ctx.beginPath(); ctx.moveTo(x + k * 9, 500); ctx.lineTo(x + k * 11, 478 - (k * k) * 2); ctx.stroke();
+        }
+      }
+    } else if (decor === 'baitrieu') {
+      ctx.fillStyle = '#c9b083'; ctx.fillRect(0, 452, W, 88);      // bãi triều cát bùn
+      ctx.fillStyle = '#b0966a'; ctx.fillRect(0, 452, W, 8);
+      // vũng nước đọng
+      ctx.fillStyle = 'rgba(120,160,170,.55)';
+      [[180, 500, 70], [480, 515, 90], [760, 500, 60]].forEach(pu => {
+        ctx.beginPath(); ctx.ellipse(pu[0], pu[1], pu[2], 12, 0, 0, 6.29); ctx.fill();
+      });
+      // cua con bò ngang (trang trí)
+      ctx.fillStyle = '#a04028';
+      const cx = 600 + Math.sin(t * 0.5) * 40;
+      ctx.beginPath(); ctx.ellipse(cx, 492, 10, 6, 0, 0, 6.29); ctx.fill();
+    } else {
+      // overview: bờ bùn + bãi cát
+      ctx.fillStyle = '#8a7a58'; ctx.fillRect(0, 452, 560, 88);
+      ctx.fillStyle = '#c9b083'; ctx.fillRect(560, 452, 400, 88);
+      ctx.fillStyle = '#6f6247'; ctx.fillRect(0, 452, 560, 8);
+      ctx.fillStyle = '#b0966a'; ctx.fillRect(560, 452, 400, 8);
+    }
+    // cái xô đỏ (mode tự do) / đồ đựng cá (mode Trốn vợ)
+    if (v.container) drawContainer(ctx, t, v.container.id, v.container.x, v.container.y, v.container.load);
+    else drawDecoBucket(ctx, 690, 492);
+    // --- Cần thủ đứng đúng điểm đã chọn ---
+    if (v.angler && decor !== 'overview') drawAnglerLand(ctx, v.angler.x, v.angler.y);
+    // bóng đổ theo giờ
+    if (v.angler && decor !== 'overview') drawGroundShadow(ctx, v.angler.x, v.angler.y + 4, 46, sky.mood);
+    if (v.container) drawGroundShadow(ctx, v.container.x, v.container.y + 6, 44, sky.mood);
+    else drawGroundShadow(ctx, 690, 500, 30, sky.mood);
+    // --- Điểm câu (phase chọn điểm): tên + mô tả + gợi ý cá ---
+    (v.spots || []).forEach(s => {
+      const pr = (t * 1.6) % 1;
+      ctx.strokeStyle = 'rgba(255,235,59,' + (1 - pr * 0.7) + ')'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 30 + pr * 14, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(20,35,28,.75)';
+      ctx.beginPath(); ctx.arc(s.x, s.y, 26, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#4dd0e1'; ctx.lineWidth = 3;
+      const n = 1 + Math.round(s.flow * 2);
+      for (let i = 0; i < n; i++) {
+        const wy = s.y - 8 + i * 9;
+        ctx.beginPath(); ctx.arc(s.x, wy, 7, 0.3, Math.PI - 0.3); ctx.stroke();
+      }
+      pill(ctx, s.name, s.x, s.y - 54);
+      // mô tả + gợi ý cá
+      ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const l1 = s.desc || '', l2 = '🎯 ' + (s.fish || '');
+      const w1 = ctx.measureText(l1).width, w2 = ctx.measureText(l2).width;
+      const bw = Math.max(w1, w2) + 24;
+      ctx.fillStyle = 'rgba(20,35,28,.78)';
+      rr(ctx, s.x - bw / 2, s.y + 34, bw, 44, 10); ctx.fill();
+      ctx.fillStyle = '#ffe9b8'; ctx.fillText(l1, s.x, s.y + 48);
+      ctx.fillStyle = '#a5d6a7'; ctx.fillText(l2, s.x, s.y + 66);
+    });
+    if (v.spotHint) pill(ctx, v.spotHint, 480, 60);
+
+    dimForMood(ctx, W, H, sky);
+    if (sky.wet) drawRain(ctx, t, W, H, wtop, 285);
+    drawOverlay(ctx, t, v);
+  }
+
   // --- Cần thủ đội nón lá (portrait). x,y: vị trí chân ---
   // --- Can thu doi non la (portrait). x,y: vi tri chan ---
   function drawAngler(ctx, x, y) {
@@ -792,6 +952,7 @@ const Art = (function () {
   // --- Scene dọc portrait (W=540, H=960): bờ + cần thủ trên, mặt nước lớn ở giữa ---
   function drawPortraitScene(ctx, t, v, W, H) {
     const river = v.map === 'song';
+    const est = v.map === 'dampha';
     const wtop = 195, wbot = 730; // mặt nước
 
     const sky = v.sky || { mood: 'day', wet: false };
@@ -823,9 +984,13 @@ const Art = (function () {
       ctx.fillStyle = '#a1887f';
       ctx.beginPath(); ctx.ellipse(bx, 690, 40, 11, 0, 0, Math.PI * 2); ctx.fill();
     }
+    if (est) {
+      // biển xa + rừng đước (bản portrait)
+      drawMangroveFar(ctx, W, 186, t, 0.62);
+    }
 
-    drawWater(ctx, 0, wtop, W, wbot - wtop, t, sky, { rows: 9, river: river });
-    if (!river) {
+    drawWater(ctx, 0, wtop, W, wbot - wtop, t, sky, { rows: 9, river: river || est, tint: est ? 'rgba(110,150,130,.22)' : null });
+    if (!river && !est) {
       // bèo tấm
       duckweedP.forEach(d => {
         const wob = Math.sin(t * 1.5 + d.x) * 2;
@@ -848,6 +1013,29 @@ const Art = (function () {
       ctx.fillStyle = '#fdd835'; ctx.beginPath(); ctx.arc(390, 420, 4.5, 0, Math.PI * 2); ctx.fill();
     }
 
+
+    // --- Điểm câu đầm phá đã chọn (portrait): decor theo điểm ---
+    if (est && pdecor !== 'overview') {
+      if (pdecor === 'cuasong') {
+        ctx.fillStyle = '#8d8d8d';
+        [[80, 700, 26], [200, 740, 34], [330, 690, 22], [460, 745, 30]].forEach(rk => {
+          ctx.beginPath(); ctx.arc(rk[0], rk[1], rk[2], 0, 6.29); ctx.fill();
+        });
+      } else if (pdecor === 'rungduoc') {
+        ctx.strokeStyle = '#4a3524'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        [90, 180, 300, 420, 500].forEach(rx => {
+          for (let k = -1; k <= 1; k++) {
+            ctx.beginPath(); ctx.moveTo(rx + k * 10, 660);
+            ctx.quadraticCurveTo(rx + k * 14, 700, rx + k * 18, 730); ctx.stroke();
+          }
+        });
+      } else if (pdecor === 'baitrieu') {
+        ctx.fillStyle = 'rgba(120,160,170,.5)';
+        [[120, 690, 90], [320, 720, 120], [470, 680, 70]].forEach(pu => {
+          ctx.beginPath(); ctx.ellipse(pu[0], pu[1], pu[2], 14, 0, 0, 6.29); ctx.fill();
+        });
+      }
+    }
 
     // --- Điểm câu sông (phase SPOT): vòng tròn TO dễ chạm ---
     (v.spots || []).forEach(s => {
@@ -874,8 +1062,8 @@ const Art = (function () {
     if (v.spotHint) pill(ctx, v.spotHint, W / 2, 120);
 
     // --- Bờ gần: cần thủ đội nón lá + xô ---
-    ctx.fillStyle = river ? '#7a9a4e' : '#9c7b54'; ctx.fillRect(0, wbot, W, H - wbot);
-    ctx.fillStyle = river ? '#6b8a42' : '#7d5f3e'; ctx.fillRect(0, wbot, W, 8);
+    ctx.fillStyle = river ? '#7a9a4e' : (est ? '#a89068' : '#9c7b54'); ctx.fillRect(0, wbot, W, H - wbot);
+    ctx.fillStyle = river ? '#6b8a42' : (est ? '#8f7852' : '#7d5f3e'); ctx.fillRect(0, wbot, W, 8);
     grassTuftsP.forEach(g => {
       ctx.strokeStyle = '#5d8f46'; ctx.lineWidth = 2;
       for (let k = -1; k <= 1; k++) {

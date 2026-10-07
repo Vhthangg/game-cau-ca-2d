@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Câu Cá Ao Làng</title>
-<link rel="stylesheet" href="style.css?v=20261007f">
+<link rel="stylesheet" href="style.css?v=20261007g">
 </head>
 <body>
 <div id="wrap">
@@ -15,6 +15,7 @@
     <span id="hud-level" class="pill">⭐ Cấp 1</span>
     <span id="hud-map" class="pill">🏡 Ao làng</span>
     <span id="hud-weather" class="pill hidden">☀️</span>
+    <span id="hud-tide" class="pill hidden">🌊</span>
     <span id="hud-giun" class="pill">🪱 0</span>
     <span id="hud-cam" class="pill">🟤 0</span>
     <span id="hud-rod" class="pill">🎣 Cần tre</span>
@@ -133,6 +134,21 @@
             <div class="card-title">🟤 Cám câu <span id="bait-cam-count" class="count">x0</span></div>
             <div class="card-desc" id="cam-desc">5.000đ / gói 10 viên — cá cắn nhanh hơn</div>
             <button id="btn-buy-cam-prep" class="btn small">Mua 5.000đ</button>
+          </div>
+          <div class="card" id="card-mou">
+            <div class="card-title">🧪 Mồi ủ lên men <span id="bait-mou-count" class="count">x0</span></div>
+            <div class="card-desc" id="mou-desc">20.000đ / gói — cá ăn cám mê mồi ủ +40%</div>
+            <button id="btn-buy-mou-prep" class="btn small">Mua 20.000đ</button>
+          </div>
+          <div class="card" id="card-dechui">
+            <div class="card-title">🦗 Dế chũi <span id="bait-dechui-count" class="count">x0</span></div>
+            <div class="card-desc" id="dechui-desc">8.000đ / con — cá săn mồi +50%</div>
+            <button id="btn-buy-dechui-prep" class="btn small">Mua 8.000đ</button>
+          </div>
+          <div class="card" id="card-lure">
+            <div class="card-title">🐟 Mồi giả (lure) <span id="bait-lure-count" class="count">x0</span></div>
+            <div class="card-desc" id="lure-desc">60.000đ / cái — dùng mãi, chỉ cần máy. Cá săn mồi +35%</div>
+            <button id="btn-buy-lure-prep" class="btn small">Mua 60.000đ</button>
           </div>
         </div>
         <p id="prep-nobait-hint" class="warn hidden">⚠️ Hết mồi! Hãy đào giun hoặc mua cám rồi quay lại.</p>
@@ -298,9 +314,9 @@
   </div>
 </div>
 
-<script src="js/config.js?v=20261007f"></script>
-<script src="js/audio.js?v=20261007f"></script>
-<script src="js/art.js?v=20261007f"></script>
-<script src="js/game.js?v=20261007f"></script>
+<script src="js/config.js?v=20261007g"></script>
+<script src="js/audio.js?v=20261007g"></script>
+<script src="js/art.js?v=20261007g"></script>
+<script src="js/game.js?v=20261007g"></script>
 </body>
 </html>
