@@ -2428,6 +2428,9 @@ function renderBoard(data) {
         '<span class="lb-score">' + escHtml(lbRowValue(e)) + '</span>' +
         '</div>';
     }).join('');
+    if (data && data.seed === true) {
+      list.innerHTML += '<p class="subtitle">🎭 Bảng làng — cần thủ ảo, chờ bạn vượt qua!</p>';
+    }
   }
   renderLbMe(top.findIndex(e => e.name === name));
 }
