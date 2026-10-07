@@ -357,60 +357,85 @@ const Art = (function () {
   // load: tỉ lệ tải kg/cap — vẽ vết rách lưới khi rọng quá tải nặng.
   function drawContainer(ctx, t, id, x, y, load) {
     if (id === 'ro') {
-      // RỌNG ĐỰNG CÁ (keepnet): miệng vành kim loại tròn, ống lưới dài thả xuống nước.
+      // RỌNG ĐỰNG CÁ Ryoma (keepnet vành tròn): ống lưới ĐỎ cao, đai vải in họa tiết ở đầu.
       const bob = Math.sin(t * 2.2) * 4;        // lập lờ theo sóng
       const sway = Math.sin(t * 1.3) * 6;       // ống lưới đung đưa nhẹ
-      const my = y + bob;                       // tâm miệng rọng (mặt nước)
-      const LEN = 108;                          // chiều dài ống lưới
-      const topW = 62, botW = 42;
-      // thân ống lưới: hình thang thuôn, tối màu cho nổi trên mặt nước
-      ctx.fillStyle = 'rgba(18,32,30,0.88)';
+      const my = y + bob;                       // miệng rọng (mặt nước)
+      const LEN = 118;                          // chiều dài ống lưới
+      const topW = 58, botW = 44;
+      // thân ống lưới ĐỎ: hình thang thuôn, lưới đỏ mờ cho thấy cá bên trong
+      ctx.fillStyle = 'rgba(198,52,48,0.62)';
       ctx.beginPath();
       ctx.moveTo(x - topW / 2, my);
       ctx.quadraticCurveTo(x - topW / 2 + sway * 0.4, my + LEN * 0.5, x - botW / 2 + sway, my + LEN);
       ctx.lineTo(x + botW / 2 + sway, my + LEN);
       ctx.quadraticCurveTo(x + topW / 2 + sway * 0.4, my + LEN * 0.5, x + topW / 2, my);
       ctx.closePath(); ctx.fill();
-      // mắt lưới chéo
-      ctx.strokeStyle = 'rgba(130,170,158,0.35)'; ctx.lineWidth = 1;
-      for (let d = -5; d <= 5; d++) {
-        ctx.beginPath(); ctx.moveTo(x + d * 12, my + 4); ctx.lineTo(x + d * 12 - 22 + sway, my + LEN - 4); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(x + d * 12, my + 4); ctx.lineTo(x + d * 12 + 22 + sway, my + LEN - 4); ctx.stroke();
+      // mắt lưới đỏ mịn (chéo, dày hơn bản cũ cho ra chất lưới Ryoma)
+      ctx.strokeStyle = 'rgba(150,28,26,0.55)'; ctx.lineWidth = 1;
+      for (let d = -6; d <= 6; d++) {
+        ctx.beginPath(); ctx.moveTo(x + d * 10, my + 4); ctx.lineTo(x + d * 10 - 20 + sway, my + LEN - 4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + d * 10, my + 4); ctx.lineTo(x + d * 10 + 20 + sway, my + LEN - 4); ctx.stroke();
       }
-      // 2 vành kim loại giữa thân ống
-      [0.38, 0.72].forEach(p => {
+      // 3 vành kim loại tròn giữa thân ống (đặc trưng rọng vành tròn)
+      [0.34, 0.6, 0.85].forEach(p => {
         const wy = my + LEN * p, ww = (topW + (botW - topW) * p) / 2;
-        ctx.strokeStyle = '#9aa5ad'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.ellipse(x + sway * p, wy, ww, 7, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#cfd8dc'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(x + sway * p, wy, ww, 6.5, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.ellipse(x + sway * p, wy - 1.5, ww, 5, 0, Math.PI, Math.PI * 2); ctx.stroke();
       });
-      // đáy ống khép
-      ctx.fillStyle = 'rgba(10,20,18,0.9)';
-      ctx.beginPath(); ctx.ellipse(x + sway, my + LEN, botW / 2, 7, 0, 0, Math.PI * 2); ctx.fill();
+      // đáy lưới tròn khép
+      ctx.fillStyle = 'rgba(150,28,26,0.85)';
+      ctx.beginPath(); ctx.ellipse(x + sway, my + LEN, botW / 2, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#eceff1'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(x + sway, my + LEN, botW / 2, 8, 0, 0, Math.PI * 2); ctx.stroke();
       // bóng cá bên trong khi có cá
       if (load > 0.01) {
-        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillStyle = 'rgba(60,10,10,0.5)';
         for (let i = 0; i < 3; i++) {
           const fy = my + LEN * (0.3 + i * 0.22), fx = x + Math.sin(t * 3 + i * 2) * 8 + sway * 0.5;
           ctx.beginPath(); ctx.ellipse(fx, fy, 9, 4, 0.2 * Math.sin(t * 2 + i), 0, Math.PI * 2); ctx.fill();
         }
       }
-      // vết rách lưới khi quá tải nặng
+      // vết rách lưới khi quá tải nặng (>120%)
       if (load > 1.2) {
-        ctx.strokeStyle = 'rgba(220,230,228,0.85)'; ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255,235,230,0.9)'; ctx.lineWidth = 1.5;
         const ry = my + LEN * 0.55, rx = x - 12 + sway * 0.5;
         ctx.beginPath(); ctx.moveTo(rx, ry);
         ctx.lineTo(rx + 8, ry + 8); ctx.lineTo(rx - 2, ry + 14); ctx.lineTo(rx + 10, ry + 22);
         ctx.stroke();
       }
-      // miệng rọng: vành kim loại + dây đai đỏ chằng ngang
-      ctx.fillStyle = 'rgba(12,22,20,0.9)';
-      ctx.beginPath(); ctx.ellipse(x, my, 31, 10, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#cfd8dc'; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.ellipse(x, my, 33, 11, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.strokeStyle = '#b71c1c'; ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.moveTo(x - 30, my - 2); ctx.lineTo(x + 30, my + 2); ctx.stroke();
-      ctx.fillStyle = '#7f0000';
-      ctx.beginPath(); ctx.arc(x, my, 4, 0, Math.PI * 2); ctx.fill();
+      // miệng rọng: vành kim loại tròn
+      ctx.fillStyle = 'rgba(120,20,18,0.9)';
+      ctx.beginPath(); ctx.ellipse(x, my, 29, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#eceff1'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(x, my, 31, 10, 0, 0, Math.PI * 2); ctx.stroke();
+      // ĐAI VẢI đầu rọng in họa tiết (mặt trời + sóng xanh) — nổi trên mặt nước
+      const cw = 62, ch = 24, cx = x - cw / 2, cy = my - ch - 6;
+      ctx.fillStyle = '#d63c34'; rr(ctx, cx, cy, cw, ch, 4); ctx.fill();
+      ctx.strokeStyle = '#8f1d18'; ctx.lineWidth = 2; rr(ctx, cx, cy, cw, ch, 4); ctx.stroke();
+      // mặt trời vàng trên đai vải
+      ctx.fillStyle = '#ffca28';
+      ctx.beginPath(); ctx.arc(cx + 16, cy + 10, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff8f00';
+      ctx.beginPath(); ctx.arc(cx + 16, cy + 10, 7, Math.PI * 0.7, Math.PI * 1.6); ctx.fill();
+      // sóng xanh dưới chân đai vải
+      ctx.strokeStyle = '#1565c0'; ctx.lineWidth = 2.5;
+      for (let wv = 0; wv < 3; wv++) {
+        ctx.beginPath();
+        ctx.arc(cx + 14 + wv * 16, cy + ch - 2, 6, Math.PI, 0);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = '#0d47a1'; ctx.lineWidth = 1.5;
+      for (let wv = 0; wv < 3; wv++) {
+        ctx.beginPath();
+        ctx.arc(cx + 22 + wv * 16, cy + ch - 2, 6, Math.PI, 0);
+        ctx.stroke();
+      }
+      // chữ hiệu nhỏ trên đai vải
+      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('RYOMA', cx + 44, cy + 11);
       // dây buộc về phía bờ + cọc cắm
       ctx.strokeStyle = '#5d4037'; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.moveTo(x + 20, my - 6);
@@ -420,22 +445,58 @@ const Art = (function () {
       return;
     }
     if (id === 'thung') {
-      // THÙNG CÂU (tackle box): hộp chữ nhật, nắp phẳng ngồi được, quai + khóa gài
-      ctx.fillStyle = '#1c1f22';                                    // chân đế
-      ctx.fillRect(x - 24, y - 4, 8, 5); ctx.fillRect(x + 16, y - 4, 8, 5);
-      ctx.fillStyle = '#2f3439'; rr(ctx, x - 28, y - 46, 56, 43, 5); ctx.fill();   // thân hộp
-      ctx.strokeStyle = '#17191c'; ctx.lineWidth = 2; rr(ctx, x - 28, y - 46, 56, 43, 5); ctx.stroke();
-      ctx.fillStyle = '#c62828'; ctx.fillRect(x - 28, y - 44, 56, 6);               // viền đỏ
-      ctx.fillStyle = 'rgba(198,40,40,.55)'; ctx.fillRect(x - 28, y - 22, 56, 3);   // sọc trang trí
-      [-13, 5].forEach(kx => {                                                     // 2 khóa gài
-        ctx.fillStyle = '#c62828'; rr(ctx, x + kx, y - 40, 8, 14, 2); ctx.fill();
-        ctx.strokeStyle = '#7f0000'; ctx.lineWidth = 1.5; rr(ctx, x + kx, y - 40, 8, 14, 2); ctx.stroke();
+      // THÙNG CÂU ĐÀI Rice Fishing: thùng ngọc lam, nắp đen, khung tựa lưng,
+      // khay mồi tròn bên hông, 4 chân chống kim loại, giá cắm cần.
+      const sway = Math.sin(t * 1.8) * 1.5;
+      // 4 chân chống kim loại (2 cặp trước/sau)
+      ctx.strokeStyle = '#9aa5ad'; ctx.lineWidth = 3;
+      [[-26, -10], [26, -10], [-22, 10], [22, 10]].forEach(([lx, lz]) => {
+        ctx.beginPath(); ctx.moveTo(x + lx, y - 8); ctx.lineTo(x + lx + lz * 0.2 + sway, y + 8); ctx.stroke();
+        ctx.fillStyle = '#616161';
+        ctx.beginPath(); ctx.ellipse(x + lx + lz * 0.2 + sway, y + 8, 4, 2, 0, 0, Math.PI * 2); ctx.fill();
       });
-      ctx.fillStyle = '#434a52'; rr(ctx, x - 30, y - 60, 60, 15, 4); ctx.fill();   // nắp phẳng
-      ctx.strokeStyle = '#22262a'; ctx.lineWidth = 2; rr(ctx, x - 30, y - 60, 60, 15, 4); ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(x - 26, y - 59, 52, 3);
-      ctx.strokeStyle = '#22262a'; ctx.lineWidth = 3;                              // quai xách lõm
-      ctx.beginPath(); ctx.moveTo(x - 10, y - 53); ctx.lineTo(x + 10, y - 53); ctx.stroke();
+      // thân thùng NGỌC LAM
+      ctx.fillStyle = '#27b3a4'; rr(ctx, x - 32, y - 56, 64, 48, 6); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.18)'; rr(ctx, x - 32, y - 56, 20, 48, 6); ctx.fill(); // vệt sáng cạnh
+      ctx.strokeStyle = '#14766d'; ctx.lineWidth = 2; rr(ctx, x - 32, y - 56, 64, 48, 6); ctx.stroke();
+      // nẹp trắng dưới nắp
+      ctx.fillStyle = '#eceff1'; ctx.fillRect(x - 32, y - 58, 64, 4);
+      // nắp ĐEN + khóa cài trước
+      ctx.fillStyle = '#21242a'; rr(ctx, x - 34, y - 72, 68, 15, 5); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(x - 30, y - 71, 60, 3);
+      ctx.strokeStyle = '#101216'; ctx.lineWidth = 2; rr(ctx, x - 34, y - 72, 68, 15, 5); ctx.stroke();
+      ctx.fillStyle = '#424a54'; rr(ctx, x - 6, y - 68, 12, 9, 2); ctx.fill();   // khóa cài
+      ctx.strokeStyle = '#101216'; ctx.lineWidth = 1.5; rr(ctx, x - 6, y - 68, 12, 9, 2); ctx.stroke();
+      // logo nhỏ trên thân thùng
+      ctx.fillStyle = '#0d3b37'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('Rice Fishing', x + 6, y - 26);
+      ctx.strokeStyle = '#0d3b37'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(x - 18, y - 30, 6, 0, Math.PI * 2); ctx.stroke(); // vòng logo
+      // KHUNG TỰA LƯNG phía sau: 2 thanh vàng-đen + đệm tựa đen
+      ctx.strokeStyle = '#3a3f45'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(x + 14, y - 70); ctx.lineTo(x + 14, y - 108); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + 30, y - 70); ctx.lineTo(x + 30, y - 108); ctx.stroke();
+      ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x + 14, y - 70); ctx.lineTo(x + 14, y - 108); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + 30, y - 70); ctx.lineTo(x + 30, y - 108); ctx.stroke();
+      ctx.fillStyle = '#21242a'; rr(ctx, x + 8, y - 120, 30, 14, 6); ctx.fill(); // đệm tựa
+      ctx.strokeStyle = '#101216'; ctx.lineWidth = 2; rr(ctx, x + 8, y - 120, 30, 14, 6); ctx.stroke();
+      // KHAY MỒI tròn bên hông: cọc kim loại + 2 khay hổ phách
+      ctx.strokeStyle = '#9aa5ad'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(x - 32, y - 60); ctx.lineTo(x - 44, y - 96); ctx.stroke();
+      ctx.fillStyle = 'rgba(245,166,35,0.75)';
+      ctx.beginPath(); ctx.ellipse(x - 48, y - 98, 13, 5, -0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#b97a1a'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(x - 48, y - 98, 13, 5, -0.15, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(245,166,35,0.6)';
+      ctx.beginPath(); ctx.ellipse(x - 40, y - 90, 11, 4.5, -0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#b97a1a'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(x - 40, y - 90, 11, 4.5, -0.15, 0, Math.PI * 2); ctx.stroke();
+      // giá cắm cần bên hông phải
+      ctx.strokeStyle = '#424a54'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(x + 32, y - 56); ctx.lineTo(x + 38, y - 78); ctx.stroke();
+      ctx.fillStyle = '#21242a';
+      ctx.beginPath(); ctx.arc(x + 38, y - 80, 4, 0, Math.PI * 2); ctx.fill();
       return;
     }
     // Xô ghẻ mặc định: xô tôn cũ màu xám, hơi móp
